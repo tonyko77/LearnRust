@@ -1,0 +1,9 @@
+[package]
+name = "rust_lab_1"
+version = "0.1.0"
+# QUIZ: what are rust editions?
+edition = "2021"
+
+[dependencies]
+rand = "0.8"
+# QUIZ: how can you add the clap crate with the derive feature?
