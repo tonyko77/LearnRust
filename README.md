@@ -1,0 +1,2 @@
+# LearnRust
+Rust learning projects
