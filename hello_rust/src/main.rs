@@ -46,5 +46,5 @@ fn main() {
     // structs::test_structs();
     // enums::test_enums();
     collections::test_common_collections();
-    // error_handling::test_error_handling();
+    error_handling::test_error_handling();
 }
