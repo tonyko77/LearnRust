@@ -39,11 +39,14 @@ use std::io;
 //    your functions cleverly you can get around that. Note that you can test private functions in rust.
 //===========================================================================================================
 
-// TODO:
+// FIXED:
 //  * I didn't think of using a "sparse" representation of the forest => REFACTOR
 //  * Create a Forest object to represent the game's current state and implement the Display trait.
+
+// TODO:
 //  * Add doc comments + QUIZ: generate cargo docs and view their website
 //  * Use Clap to generate a CLI for this simulation ....
+
 
 const GRID_SIZE_X:usize = 5;
 const GRID_SIZE_Y:usize = 5;
@@ -79,10 +82,58 @@ impl Coord {
 }
 
 
-/// The Representation of the hide and seek game
-struct GameState {
+/// The Representation of the game grid (i.e. the forest)
+struct Forest {
     player_pos: Coord,
     sister_pos: Coord,
+}
+
+impl Forest {
+    fn new(player_pos: Coord, sister_pos: Coord) -> Self {
+        Forest {
+            player_pos: player_pos,
+            sister_pos: sister_pos,
+        }
+    }
+
+    fn is_player_at(&self, pos: &Coord) -> bool {
+        *pos == self.player_pos
+    }
+
+    fn is_sister_at(&self, pos: &Coord) -> bool {
+        *pos == self.sister_pos
+    }
+
+    fn is_tree_at(&self, pos: &Coord) -> bool {
+        (*pos != self.player_pos) &&
+        (*pos != self.sister_pos)
+    }
+}
+
+impl fmt::Display for Forest {
+    // Write into the supplied output stream: `f`.
+    // Returns `fmt::Result` which indicates whether the operation succeeded or failed.
+    // Note that `write!` uses syntax which is very similar to `println!`.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for y in 0..GRID_SIZE_Y {
+            for x in 0..GRID_SIZE_X {
+                let pos = Coord {x, y};
+                let chr =
+                    if pos == self.player_pos { 'P' }
+                    else if pos == self.sister_pos { 'S' }
+                    else { '_' };
+                write!(f, "{chr}")?;
+            }
+            writeln!(f, "")?;
+        }
+        Ok(())
+    }
+}
+
+
+/// The Representation of the hide and seek game
+struct GameState {
+    forest: Forest,
     your_health: i32,
     bro_expl_cnt: i32,
     blast_history: Vec<Coord>,  // remember bombed positions (until bro gets a hit => we move => clear history)
@@ -114,29 +165,18 @@ impl GameState {
     }
 
     pub fn print_map(&self) {
-        for y in 0..GRID_SIZE_Y {
-            for x in 0..GRID_SIZE_X {
-                let pos = Coord {x, y};
-                let chr =
-                    if pos == self.player_pos { 'P' }
-                    else if pos == self.sister_pos { 'S' }
-                    else { '_' };
-                print!("{chr}");
-            }
-            println!("");
-        }
+        print!("{}", self.forest)
     }
 
     pub fn perform_step(&mut self) {
-        let bomb_pos = self.pick_position_to_bomb();
+        let bomb_pos = self.pick_position_to_blast();
         let new_player_pos = self.random_pos_in_forest();
         self.perform_step_customized(bomb_pos, new_player_pos);
     }
 
     fn new_customized(player_pos: Coord, sister_pos: Coord) -> Self {
         GameState {
-            player_pos: player_pos,
-            sister_pos: sister_pos,
+            forest: Forest::new(player_pos, sister_pos),
             your_health: START_HEALTH,
             bro_expl_cnt: START_EXPLOSIONS,
             blast_history: vec![],
@@ -147,10 +187,10 @@ impl GameState {
     fn perform_step_customized(&mut self, bomb_pos: Coord, new_player_pos: Coord) {
         println!("Your brother is attacking ({}, {})!", bomb_pos.x, bomb_pos.y);
         self.bro_expl_cnt -= 1;
-        if bomb_pos == self.player_pos {
+        if self.forest.is_player_at(&bomb_pos) {
             self.brother_hit_player(new_player_pos);
         }
-        else if bomb_pos == self.sister_pos {
+        else if self.forest.is_sister_at(&bomb_pos) {
             self.brother_hit_sister();
         }
         else {
@@ -164,7 +204,7 @@ impl GameState {
         println!("Your brother hit you!");
         self.your_health -= 1;
         // move away
-        self.player_pos = new_player_pos;
+        self.forest.player_pos = new_player_pos;
         // reset the blast history
         self.blast_history.clear();
     }
@@ -190,19 +230,21 @@ impl GameState {
 
     fn random_pos_in_forest(&self) -> Coord {
         self.random_pos_conditioned(|game, coord|
-            *coord != game.player_pos && *coord != game.sister_pos
+            game.forest.is_tree_at(coord)
         )
     }
 
-    fn pick_position_to_bomb(&self) -> Coord {
+    fn pick_position_to_blast(&self) -> Coord {
         self.random_pos_conditioned(|game, coord|
-            if game.bombed_sis_pos && *coord == game.sister_pos {
-                false
-            }
-            else {
-                !game.blast_history.contains(&coord)
-            }
+            game.good_position_to_blast(coord)
         )
+    }
+
+    fn good_position_to_blast(&self, pos: &Coord) -> bool {
+        if self.bombed_sis_pos && *pos == self.forest.sister_pos {
+            return false;
+        }
+        !self.blast_history.contains(pos)
     }
 }
 
@@ -246,12 +288,12 @@ mod test {
     /// Tests that a grid is valid. IE it contains trees, you, and your sister.
     #[test]
     fn test_valid_grid() {
-        let your_pos = Coord { x: 0, y: 0 };
+        let player_pos = Coord { x: 0, y: 0 };
         let sister_pos = Coord { x: 0, y: 1 };
-        let game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
 
-        assert_eq!(your_pos, game.player_pos);
-        assert_eq!(sister_pos, game.sister_pos);
+        assert_eq!(player_pos, game.forest.player_pos);
+        assert_eq!(sister_pos, game.forest.sister_pos);
     }
 
     /// Tests that the initial game state is as expected
@@ -269,16 +311,16 @@ mod test {
     /// Tests the state of the game after bombing an empty spot
     #[test]
     fn test_bomb_empty_spot() {
-        let your_pos = Coord { x: 1, y: 0 };
+        let player_pos = Coord { x: 1, y: 0 };
         let sister_pos = Coord { x: 2, y: 1 };
-        let mut game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
         let bomb_pos = Coord { x: 2, y: 3};
 
         game.perform_step_customized(bomb_pos.clone(), Coord::random());
 
         assert_eq!(GameStatus::Running, game.status());         // the game is still running
-        assert_eq!(your_pos, game.player_pos);                  // player's position didn't change
-        assert_eq!(sister_pos, game.sister_pos);                // sister's position didn't change
+        assert_eq!(player_pos, game.forest.player_pos);           // player's position didn't change
+        assert_eq!(sister_pos, game.forest.sister_pos);         // sister's position didn't change
         assert_eq!(START_HEALTH, game.your_health);             // player's health didn't change
         assert_eq!(START_EXPLOSIONS - 1, game.bro_expl_cnt);    // bro's expl. count has decreased
         assert_eq!(1, game.blast_history.len());                // bombed position history was updated
@@ -288,16 +330,16 @@ mod test {
     /// Tests the state of the game after bombing the sister
     #[test]
     fn test_bomb_sister() {
-        let your_pos = Coord { x: 1, y: 0 };
+        let player_pos = Coord { x: 1, y: 0 };
         let sister_pos = Coord { x: 2, y: 1 };
-        let mut game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
 
         game.perform_step_customized(sister_pos.clone(), Coord::random());
 
         let expected_expl_after = START_EXPLOSIONS - 1 - EXPLOSIONS_LOST_ON_FREEZE;
         assert_eq!(GameStatus::Running, game.status());         // the game is still running
-        assert_eq!(your_pos, game.player_pos);                  // player's position didn't change
-        assert_eq!(sister_pos, game.sister_pos);                // sister's position didn't change
+        assert_eq!(player_pos, game.forest.player_pos);           // player's position didn't change
+        assert_eq!(sister_pos, game.forest.sister_pos);         // sister's position didn't change
         assert_eq!(START_HEALTH, game.your_health);             // player's health didn't change
         assert_eq!(expected_expl_after, game.bro_expl_cnt);     // bro's expl. count has decreased
         assert_eq!(true, game.bombed_sis_pos);                  // sister's position WAS discovered
@@ -306,16 +348,16 @@ mod test {
     /// Tests the state of the game after bombing the player
     #[test]
     fn test_bomb_player() {
-        let your_pos = Coord { x: 1, y: 0 };
+        let player_pos = Coord { x: 1, y: 0 };
         let sister_pos = Coord { x: 2, y: 1 };
         let new_pos = Coord { x: 3, y: 2 };
-        let mut game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
 
-        game.perform_step_customized(your_pos.clone(), new_pos.clone());
+        game.perform_step_customized(player_pos.clone(), new_pos.clone());
 
         assert_eq!(GameStatus::Running, game.status());         // the game is still running
-        assert_eq!(new_pos, game.player_pos);                   // player's position DID change
-        assert_eq!(sister_pos, game.sister_pos);                // sister's position didn't change
+        assert_eq!(new_pos, game.forest.player_pos);            // player's position DID change
+        assert_eq!(sister_pos, game.forest.sister_pos);         // sister's position didn't change
         assert_eq!(START_HEALTH - 1, game.your_health);         // player's health did change
         assert_eq!(START_EXPLOSIONS - 1, game.bro_expl_cnt);    // bro's expl. count has decreased
         assert_eq!(false, game.bombed_sis_pos);                 // sister's position wasn't discovered
@@ -324,13 +366,13 @@ mod test {
     /// Tests the state of the game after using the final bomb to blast the player's last life
     #[test]
     fn test_bomb_player_game_over_brother_won() {
-        let your_pos = Coord { x: 1, y: 0 };
+        let player_pos = Coord { x: 1, y: 0 };
         let sister_pos = Coord { x: 2, y: 1 };
-        let mut game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
         game.your_health = 1;
         game.bro_expl_cnt = 1;
 
-        game.perform_step_customized(your_pos.clone(), Coord::random());
+        game.perform_step_customized(player_pos.clone(), Coord::random());
 
         assert_eq!(GameStatus::BrotherWon, game.status());  // the game is over, your brother won
         assert_eq!(0, game.your_health);                    // your last HP was consumed
@@ -340,13 +382,13 @@ mod test {
     /// Tests the state of the game after using the final bomb, and the player is still alive
     #[test]
     fn test_bomb_player_game_over_you_won() {
-        let your_pos = Coord { x: 1, y: 0 };
+        let player_pos = Coord { x: 1, y: 0 };
         let sister_pos = Coord { x: 2, y: 1 };
-        let mut game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
         game.your_health = 2;
         game.bro_expl_cnt = 1;
 
-        game.perform_step_customized(your_pos.clone(), Coord::random());
+        game.perform_step_customized(player_pos.clone(), Coord::random());
 
         assert_eq!(GameStatus::YouWon, game.status());  // the game is over, your brother won
         assert_eq!(1, game.your_health);                // your still have 1 HP
@@ -356,9 +398,9 @@ mod test {
     /// Tests that the blast history is updated when hitting an empty space
     #[test]
     fn test_blast_history_updated_after_empty_spot_is_hit() {
-        let your_pos = Coord { x: 1, y: 0 };
+        let player_pos = Coord { x: 1, y: 0 };
         let sister_pos = Coord { x: 2, y: 1 };
-        let mut game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
         let bomb_pos = Coord { x: 2, y: 3};
         // put some random items in history
         let hist_size_before = 3;
@@ -375,9 +417,9 @@ mod test {
     /// Tests that the blast history is NOT updated when hitting the sister
     #[test]
     fn test_blast_history_not_updated_after_sister_is_hit() {
-        let your_pos = Coord { x: 1, y: 0 };
+        let player_pos = Coord { x: 1, y: 0 };
         let sister_pos = Coord { x: 2, y: 1 };
-        let mut game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
 
         game.perform_step_customized(sister_pos.clone(), Coord::random());
 
@@ -387,18 +429,65 @@ mod test {
     /// Tests that the blast history is cleared after hitting the player (and sister was not yet hit)
     #[test]
     fn test_blast_history_cleared_after_player_is_hit_and_sister_was_not_hit() {
-        let your_pos = Coord { x: 1, y: 0 };
+        let player_pos = Coord { x: 1, y: 0 };
         let sister_pos = Coord { x: 2, y: 1 };
-        let mut game = GameState::new_customized(your_pos.clone(), sister_pos.clone());
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
         // put some random items in history
         let hist_size_before = 3;
         for _ in 0..hist_size_before {
             game.blast_history.push(Coord::random());
         }
 
-        game.perform_step_customized(your_pos.clone(), Coord::random());
+        game.perform_step_customized(player_pos.clone(), Coord::random());
 
         assert!(game.blast_history.is_empty());
+    }
+
+    /// Tests that any position is ok to blast in the beginning
+    #[test]
+    fn test_any_position_ok_to_blast_initially() {
+        let player_pos = Coord { x: 1, y: 0 };
+        let sister_pos = Coord { x: 2, y: 1 };
+        let game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
+
+        for x in 0..GRID_SIZE_X {
+            for y in 0..GRID_SIZE_Y {
+                let pos = Coord { x, y };
+                assert_eq!(true, game.good_position_to_blast(&pos));
+            }
+        }
+    }
+
+    /// Tests that a position is NOT ok to blast if already blasted
+    #[test]
+    fn test_not_ok_to_blast_position_already_in_history() {
+        let player_pos = Coord { x: 1, y: 0 };
+        let sister_pos = Coord { x: 2, y: 1 };
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
+        let blast_pos = Coord { x: 3, y: 3 };
+
+        game.perform_step_customized(blast_pos.clone(), Coord::random());
+
+        assert_eq!(false, game.good_position_to_blast(&blast_pos));
+    }
+
+    /// Tests that sister position is NOT ok to blast even after history reset
+    #[test]
+    fn test_not_ok_to_blast_sister_if_already_blasted() {
+        let player_pos = Coord { x: 1, y: 0 };
+        let sister_pos = Coord { x: 2, y: 1 };
+        let mut game = GameState::new_customized(player_pos.clone(), sister_pos.clone());
+
+        // initially ok to blast sister
+        assert_eq!(true, game.good_position_to_blast(&sister_pos));
+
+        // blast the sister => no longer ok
+        game.perform_step_customized(sister_pos.clone(), Coord::random());
+        assert_eq!(false, game.good_position_to_blast(&sister_pos));
+
+        // even if we clear the blast history (by blasting the player), sister still not ok to blast
+        game.perform_step_customized(player_pos.clone(), Coord::random());
+        assert_eq!(false, game.good_position_to_blast(&sister_pos));
     }
 
 }
