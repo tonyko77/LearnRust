@@ -28,6 +28,7 @@ mod first_word;
 mod collections;
 mod error_handling;
 mod playground;
+mod lifetimes;
 
 // Public modules
 pub mod enums;
@@ -49,4 +50,5 @@ fn main() {
     // collections::test_common_collections();
     // error_handling::test_error_handling();
     playground::playground();
+    lifetimes::lifetimes();
 }
