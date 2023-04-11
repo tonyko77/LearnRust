@@ -27,6 +27,7 @@ mod ownership;
 mod first_word;
 mod collections;
 mod error_handling;
+mod playground;
 
 // Public modules
 pub mod enums;
@@ -45,6 +46,7 @@ fn main() {
     // first_word::test_first_word_corner_cases();
     // structs::test_structs();
     // enums::test_enums();
-    collections::test_common_collections();
-    error_handling::test_error_handling();
+    // collections::test_common_collections();
+    // error_handling::test_error_handling();
+    playground::playground();
 }
