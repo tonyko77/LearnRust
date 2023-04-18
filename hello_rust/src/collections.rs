@@ -1,12 +1,43 @@
 //----------------------------------------------------------------
 // (8) Common Collections
 
+// Available collection types:
+// -> see: https://docs.rust-lang.org/std/collections/index.html
+//  * Sequences: Array, Vector, VecDeque, LinkedList
+//  * Maps: HashMap, BTreeMap
+//  * Sets: HashSet, BTreeSet
+//  * Others: BinaryHeap, String, Tuple
+
+
 pub(crate) fn test_common_collections() {
     println!("\n=============================\n--> Collections:");
 
+    _test_arrays();
     _test_vectors();
     _test_strings();
     _test_hash_maps();
+}
+
+
+fn _test_arrays() {
+    // single dimension array - MUST specify the dimension
+    let single_dim: [u32; 16] = [0; 16];
+
+    // 2D array - MUST specify the dimensions
+    let two_dim: [[i16; 4]; 5] = [[0; 4]; 5];
+
+    // init array with some values
+    let inited_array = [1, 2, 3, 4, 5];
+
+    // init array with default value
+    let defaulted_array = [-1; 100];
+
+    // iterate over an array
+    for i in inited_array.iter() {
+        println!("Value from array: {i}");
+    }
+    // print entire array
+    println!("Entire array: {:?}", inited_array);
 }
 
 
