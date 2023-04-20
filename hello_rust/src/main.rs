@@ -47,7 +47,7 @@ fn main() {
     // first_word::test_first_word_corner_cases();
     // structs::test_structs();
     // enums::test_enums();
-    // collections::test_common_collections();
+    collections::test_common_collections();
     // error_handling::test_error_handling();
     playground::playground();
     lifetimes::lifetimes();

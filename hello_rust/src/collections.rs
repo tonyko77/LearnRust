@@ -58,6 +58,11 @@ fn _test_vectors() {
     let e2: &i32 = &v[1];
     let e3: Option<&i32> = v.get(2);
     println!("First={e1}, second={e2}, third={}", e3.unwrap_or(&999));
+
+    // update the first element via a mutable reference
+    let x = &mut v[0];
+    *x = 42;
+
     // no problem if not using refs -> i32 has Copy trait :)
     println!("Again: First={}, second={}, third={}", v[0], v[1], v[2]);
 
