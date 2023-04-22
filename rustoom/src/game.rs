@@ -2,12 +2,12 @@
 
 use crate::wad;
 
-pub struct DoomGame<'a> {
-    wad_data: wad::WadData<'a>,
+pub struct DoomGame {
+    wad_data: wad::WadData,
 }
 
 
-impl<'a> DoomGame<'a> {
+impl DoomGame {
     pub fn new(wad_data: wad::WadData) -> DoomGame {
         DoomGame { wad_data }
     }
