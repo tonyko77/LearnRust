@@ -7,6 +7,21 @@
 //          https://github.com/amroibrahim/DIYDoom
 //======================================================================================
 
-fn main() {
-    println!("Hello, world!");
+// TODO - TEMPORARYLY disable warnings for dead code
+#![allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(unused_imports)]
+
+mod game;
+mod wad;
+mod lump;
+mod gfx;
+
+fn main() -> Result<(), String> {
+    let wad_path = "doom.wad";
+    let wad_data = wad::WadData::load(wad_path, wad::WadKind::IWAD)?;
+    let _doom_game = game::DoomGame::new(wad_data);
+
+    println!("*** Doom game loaded ok ***");
+    Ok(())
 }

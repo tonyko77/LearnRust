@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 rand = "0.8"
 sdl2 = "0.35"
+
+# temporary import, until I learn how to use SDL2 :))
+olc_pixel_game_engine = { git = "https://github.com/sadikovi/olcPixelGameEngine-rs", branch = "master" }
