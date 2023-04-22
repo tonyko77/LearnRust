@@ -16,6 +16,7 @@ mod game;
 mod wad;
 mod lump;
 mod gfx;
+mod utils;
 
 fn main() -> Result<(), String> {
     let wad_path = "doom.wad";

@@ -1,10 +1,6 @@
 // WAD loader and parser
 
-use crate::lump;
-use std::collections::HashMap;
-use std::{io, fs, str};
-use std::io::prelude::*;
-
+use crate::utils;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WadKind {
@@ -12,19 +8,18 @@ pub enum WadKind {
     PWAD,
 }
 
-//------------------------------------------
 
+// see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes001/notes
 pub struct WadData {
     lump_count: usize,
     dir_offset: usize,
     wad_bytes: Vec<u8>,
     // TODO ?? lump_dict: HashMap<&'a str, lump::LumpData<'a>>,
-    // TODO to be continued ...
 }
 
 
 impl WadData {
-    // see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes001/notes
+
     pub fn load(wad_path: &str, expected_kind: WadKind) -> Result<WadData, String> {
         // read WAD file bytes
         let wad_read = std::fs::read(wad_path);
@@ -38,15 +33,15 @@ impl WadData {
             return Err(format!("WAD file {wad_path} is too small"));
         }
         // hdr[0..4] => "IWAD" or "PWAD"
-        let wad_kind_str = str::from_utf8(&wad_bytes[0..4]);
+        let wad_kind_str = std::str::from_utf8(&wad_bytes[0..4]);
         let wad_kind_str = match wad_kind_str {
             Ok(kind) => String::from(kind),
             Err(_) => String::from("cannot parse"),
         };
         // hdr[4..8] = number of lumps / directory entries
-        let lump_count = buf_to_u32(&wad_bytes[4..8]) as usize;
+        let lump_count = utils::buf_to_u32(&wad_bytes[4..8]) as usize;
         // hdr[8..12] = offset of directory entries
-        let dir_offset = buf_to_u32(&wad_bytes[8..12]) as usize;
+        let dir_offset = utils::buf_to_u32(&wad_bytes[8..12]) as usize;
 
         // verify the wad kind
         let expected_kind_str = match expected_kind {
@@ -68,27 +63,4 @@ impl WadData {
         Ok(wad_data)
     }
 
-    // TODO to be continued ...
-}
-
-
-//-----------------------------------------------
-// TODO move these to some common utils !!!
-
-#[inline]
-fn buf_to_u16(buf: &[u8]) -> u16 {
-    assert!(buf.len() >= 2);
-
-    (buf[0] as u16) |
-    ((buf[1] as u16) <<  8)
-}
-
-#[inline]
-fn buf_to_u32(buf: &[u8]) -> u32 {
-    assert!(buf.len() >= 4);
-
-    (buf[0] as u32) |
-    ((buf[1] as u32) <<  8) |
-    ((buf[2] as u32) << 16) |
-    ((buf[3] as u32) << 24)
 }
