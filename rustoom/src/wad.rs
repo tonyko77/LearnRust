@@ -9,12 +9,17 @@ pub enum WadKind {
 }
 
 
+pub struct LumpData<'a> {
+    pub name: String,
+    pub bytes: &'a [u8],
+}
+
+
 // see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes001/notes
 pub struct WadData {
     lump_count: usize,
     dir_offset: usize,
     wad_bytes: Vec<u8>,
-    // TODO ?? lump_dict: HashMap<&'a str, lump::LumpData<'a>>,
 }
 
 
@@ -52,15 +57,48 @@ impl WadData {
             return Err(format!("Invalid WAD type: {wad_kind_str}"));
         }
 
-        // TODO - TEMP logging
-        println!("[DBG] Loaded {wad_kind_str} file: {wad_path}");
-        println!("[DBG]  => Lump Count: {lump_count}");
-        println!("[DBG]  => Dir Offset: 0x{:08X}", dir_offset);
-        println!("[DBG]  => WAD size: {}", wad_bytes.len());
-
         // ok to build the WAD data
         let wad_data = WadData { lump_count, dir_offset, wad_bytes };
+
         Ok(wad_data)
+    }
+
+    pub fn get_lump_count(&self) -> usize {
+        self.lump_count
+    }
+
+    pub fn get_lump(&self, idx: usize) -> Result<LumpData, String> {
+        if idx >= self.lump_count {
+            Err(format!("Invalid lump index: index {idx} >= count {} ", self.lump_count))
+        }
+        else {
+            let offs = self.dir_offset + 16 * idx;
+            let lump_start = utils::buf_to_u32(&self.wad_bytes[offs .. (offs+4)]) as usize;
+            let lump_size = utils::buf_to_u32(&self.wad_bytes[(offs+4) .. (offs+8)]) as usize;
+            let wad_len = self.wad_bytes.len();
+            let lump_end = lump_start + lump_size;
+            if lump_end >= wad_len {
+                Err(format!("Lump too big: offs {lump_start} + size {lump_size} >= wad len {wad_len} "))
+            }
+            else {
+                let name_start = offs + 8;
+                let mut name_end = offs + 16;
+                // dismiss all null bytes at the end
+                while (name_end > name_start) && (0 == self.wad_bytes[name_end - 1]) {
+                    name_end -= 1;
+                }
+                let name_bytes = &self.wad_bytes[name_start .. name_end];
+                let name_str = std::str::from_utf8(name_bytes);
+                match name_str {
+                    Ok(name) => Ok(LumpData {
+                        name: String::from(name),
+                        bytes: &self.wad_bytes[lump_start .. lump_end],
+                    }),
+                    // this should not happen anyway - lump names should always be ASCII
+                    Err(_) => Err(format!("Invalid lump name at index {idx}")),
+                }
+            }
+        }
     }
 
 }

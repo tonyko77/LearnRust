@@ -14,14 +14,13 @@
 
 mod game;
 mod wad;
-mod lump;
 mod gfx;
 mod utils;
 
 fn main() -> Result<(), String> {
     let wad_path = "doom.wad";
     let wad_data = wad::WadData::load(wad_path, wad::WadKind::IWAD)?;
-    let _doom_game = game::DoomGame::new(wad_data);
+    let doom_game = game::DoomGame::new(wad_data)?;
 
     println!("*** Doom game loaded ok ***");
     Ok(())
