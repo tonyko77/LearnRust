@@ -24,7 +24,7 @@ impl DoomGame {
         println!("[DBG] WAD Lump Count: {lump_count}");
         for i in 0 .. lump_count {
             let lump = wad_data.get_lump(i)?;
-            println!("[DBG]   => Lump{:4}: {:8} - len={}", i, lump.name, lump.bytes.len());
+            println!("[DBG]   => {:4}: {:8} -> len={}", i, lump.name, lump.bytes.len());
         }
 
         // TODO to be continued ...

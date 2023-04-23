@@ -10,7 +10,7 @@ pub enum WadKind {
 
 
 pub struct LumpData<'a> {
-    pub name: String,
+    pub name: &'a str,
     pub bytes: &'a [u8],
 }
 
@@ -57,10 +57,11 @@ impl WadData {
             return Err(format!("Invalid WAD type: {wad_kind_str}"));
         }
 
-        // ok to build the WAD data
-        let wad_data = WadData { lump_count, dir_offset, wad_bytes };
-
-        Ok(wad_data)
+        Ok(WadData {
+            lump_count,
+            dir_offset,
+            wad_bytes
+        })
     }
 
     pub fn get_lump_count(&self) -> usize {
@@ -91,7 +92,7 @@ impl WadData {
                 let name_str = std::str::from_utf8(name_bytes);
                 match name_str {
                     Ok(name) => Ok(LumpData {
-                        name: String::from(name),
+                        name,
                         bytes: &self.wad_bytes[lump_start .. lump_end],
                     }),
                     // this should not happen anyway - lump names should always be ASCII
