@@ -1,5 +1,7 @@
 //  Various utilities
 
+// TODO - doc comments EVERYWHERE !!!
+
 
 #[inline]
 pub fn buf_to_u16(buf: &[u8]) -> u16 {
@@ -7,6 +9,12 @@ pub fn buf_to_u16(buf: &[u8]) -> u16 {
 
     (buf[0] as u16) |
     ((buf[1] as u16) <<  8)
+}
+
+
+#[inline]
+pub fn buf_to_i16(buf: &[u8]) -> i16 {
+    buf_to_u16(buf) as i16
 }
 
 
