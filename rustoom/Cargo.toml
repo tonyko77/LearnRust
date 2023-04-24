@@ -6,8 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rand = "0.8"
+#rand = "0.8"
+fastrand = "1.9"
 sdl2 = "0.35"
 
 # temporary import, until I learn how to use SDL2 :))
-olc_pixel_game_engine = { git = "https://github.com/sadikovi/olcPixelGameEngine-rs", branch = "master" }
+#olc_pixel_game_engine = { git = "https://github.com/sadikovi/olcPixelGameEngine-rs", branch = "master" }

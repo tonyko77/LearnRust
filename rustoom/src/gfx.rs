@@ -1,6 +1,6 @@
 // Graphics wrapper
 
-use olc_pixel_game_engine as olc;
+// use olc_pixel_game_engine as olc;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color {
