@@ -29,10 +29,9 @@ mod collections;
 mod error_handling;
 mod playground;
 mod lifetimes;
-
-// Public modules
-pub mod enums;
-pub mod structs;
+mod enums;
+mod structs;
+mod traits;
 
 
 // Some constants
