@@ -47,12 +47,15 @@ use sdl2::mouse::Cursor;
 use sdl2::rect::Rect;
 use sdl2::rect::Point;
 use sdl2::surface::Surface;
+use sdl2::pixels::PixelFormatEnum;
+
+use fastrand;
+
+use std::time::Instant;
 use std::time::Duration;
 use std::env;
 use std::path::Path;
-//use rand::prelude::*;
-use fastrand;
-use std::time::Instant;
+
 
 const WIDTH: u32 = 320;
 const HEIGHT: u32 = 240;
@@ -60,8 +63,8 @@ const PIX_SIZE: u32 = 3;
 const SCR_WIDTH: u32 = WIDTH * PIX_SIZE;
 const SCR_HEIGHT: u32 = HEIGHT * PIX_SIZE;
 
+
 pub fn test_sdl2() -> Result<(), String> {
-    //let mut rng = rand::thread_rng();
     let mut time_cnt = 0;
     let mut time_sum = 0.0;
     let mut time_min = 0.0;
@@ -79,11 +82,19 @@ pub fn test_sdl2() -> Result<(), String> {
 
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
 
-    canvas.set_draw_color(Color::RGB(255, 0, 0));
-    canvas.clear();
-    canvas.present();
-    let mut event_pump = sdl_context.event_pump()?;
+    // create texture, to paint on
+    let texture_creator = canvas.texture_creator();
+    let mut texture = texture_creator
+        .create_texture_streaming(PixelFormatEnum::RGB24, WIDTH, HEIGHT)
+        .map_err(|e| e.to_string())?;
 
+    //let mut surface = Surface::new(WIDTH, HEIGHT, PixelFormatEnum::RGB24)?;
+
+    // canvas.set_draw_color(Color::RGB(255, 0, 0));
+    // canvas.clear();
+    // canvas.present();
+
+    let mut event_pump = sdl_context.event_pump()?;
     let mut moment = Instant::now();
 
     'running: loop {
@@ -120,9 +131,26 @@ pub fn test_sdl2() -> Result<(), String> {
         }
 
         // draw stuff
-        // TODO improve this using SDL textures:
+        // improved this using SDL textures:
         // - see: https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/renderer-texture.rs
         // - see: https://www.reddit.com/r/cpp_questions/comments/eqwsao/sdl_rendering_way_too_slow/
+        texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
+            // all painting must be done in this closure
+            for y in 0..(HEIGHT as usize) {
+                for x in 0..(WIDTH as usize) {
+                    let r = fastrand::u8(0..=255);
+                    let g = fastrand::u8(0..=255);
+                    let b = fastrand::u8(0..=255);
+    
+                    let offset = y * pitch + x * 3;
+                    buffer[offset + 0] = r;
+                    buffer[offset + 1] = g;
+                    buffer[offset + 2] = b;
+                }
+            }
+        })?;
+
+/* OLD DRAW, directly on canvas (I need to read a SDL tutorial ...)
         for y in 0 .. HEIGHT {
             for x in 0 .. WIDTH {
                 // let r = rng.gen_range(0..=255);
@@ -142,7 +170,10 @@ pub fn test_sdl2() -> Result<(), String> {
                 ))?;
             }
         }
+*/
+        canvas.copy(&texture, None, None)?;
         canvas.present();
+
         //::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 100));
         // The rest of the game loop goes here...
     }
