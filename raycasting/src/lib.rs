@@ -10,6 +10,7 @@ pub use raycaster::*;
 
 // needed because we pass Event instances to our handler
 pub use sdl2::event::Event;
+pub use sdl2::keyboard::Keycode;
 
 
 pub const      BLACK: RGB = RGB { r:   0, g:   0, b:   0 };

@@ -7,6 +7,13 @@ fn main() {
 
     let usgn: u8 = 128;
     println!("u8={usgn} => u8->i8={} ,", usgn as i8);
+
+    // test casting chars to int
+    for ch in 'A'..'F' {
+        let cod = ch as u32;
+        let d = (ch as u8) - ('A' as u8) + 10;
+        println!("ch={ch} => code={cod} , d={d}");
+    }
 }
 
 

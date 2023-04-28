@@ -1,7 +1,7 @@
 //! Simple ray-casting engine demo, using SDL2
 //! Inspired by [this YouTube clip](https://www.youtube.com/watch?v=gYRrGTC7GtA)
 
-use raycasting::{self, RayCasterBuilder, SdlConfiguration, RayCastingDemo};
+use raycasting::*;
 
 const MAP_WIDTH: u32 = 10;
 const MAP_HEIGHT: u32 = 10;
@@ -18,9 +18,9 @@ const MAP: &'static str = concat!(
     "AAAAAAAAAA",
 );
 
-const SCR_WIDTH: u32 = 400;
-const SCR_HEIGHT: u32 = 200;
-const PIXEL_SIZE: u32 = 3;
+const SCR_WIDTH: u32 = 500;
+const SCR_HEIGHT: u32 = 300;
+const PIXEL_SIZE: u32 = 2;
 
 const SHOULD_SLEEP: bool = true;
 
@@ -31,7 +31,8 @@ fn main() {
         .scr_size(SCR_WIDTH, SCR_HEIGHT)
         .map_size(MAP_WIDTH, MAP_HEIGHT)
         .map_from_str(MAP);
-    let _raycaster = builder.build(); // TODO use this !!!
+
+    let mut raycaster = builder.build();
 
     let sdl_config = SdlConfiguration::new(
         "Ray Caster Demo",
@@ -41,9 +42,8 @@ fn main() {
         SHOULD_SLEEP);
 
     // main game loop
-    let mut demo = RayCastingDemo::new(SCR_WIDTH, SCR_HEIGHT);
-    let ok = raycasting::run_sdl_loop(&sdl_config, &mut demo);
-    if let Err(msg) = ok {
+    let res = raycasting::run_sdl_loop(&sdl_config, &mut raycaster);
+    if let Err(msg) = res {
         println!("ERROR: {msg}");
     }
     else {
