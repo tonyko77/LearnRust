@@ -3,30 +3,43 @@
 
 use raycasting::{self, RayCasterBuilder, SdlConfiguration, GraphicsLoop, RGB, Event, Painter};
 
-const MAP_WIDTH: u32 = 8;
-const MAP_HEIGHT: u32 = 8;
+const MAP_WIDTH: u32 = 10;
+const MAP_HEIGHT: u32 = 10;
 const MAP: &'static str = concat!(
-    "########",
-    "#...#..#",
-    "#.###..#",
-    "#.#....#",
-    "#......#",
-    "#....#.#",
-    "#..@...#",
-    "########",
+    "AAAAAAAAAA",
+    "A........A",
+    "A....AAA.A",
+    "A..AAA.A.A",
+    "A..A...AAA",
+    "A........A",
+    "A.AA.....A",
+    "A.A..@.A.A",
+    "A........A",
+    "AAAAAAAAAA",
 );
+
+const SCR_WIDTH: u32 = 800;
+const SCR_HEIGHT: u32 = 400;
+const PIXEL_SIZE: u32 = 1;
 
 //------------------------------------
 
 fn main() {
-    // build the ray caster
     let mut builder = RayCasterBuilder::new();
-    builder.width(MAP_WIDTH).height(MAP_HEIGHT).map_from_str(MAP);
-    let _raycaster = builder.build();
+    builder
+        .scr_size(SCR_WIDTH, SCR_HEIGHT)
+        .map_size(MAP_WIDTH, MAP_HEIGHT)
+        .map_from_str(MAP);
+    let raycaster = builder.build();
+
+    let sdl_config = SdlConfiguration::new(
+        "Ray Caster Demo",
+        SCR_WIDTH,
+        SCR_HEIGHT,
+        PIXEL_SIZE);
 
     // main game loop
-    let sdl_config = SdlConfiguration::new("Ray Caster Demo", 320, 240, 3);
-    let mut demo = Demo {};
+    let mut demo = Demo { cnt: 1, dir: 1, };
     let ok = raycasting::run_sdl_loop(&sdl_config, &mut demo);
     if let Err(msg) = ok {
         println!("ERROR: {msg}");
@@ -39,20 +52,30 @@ fn main() {
 //------------------------------------
 
 struct Demo {
+    cnt: i32,
+    dir: i32,
 }
 
 
 impl GraphicsLoop for Demo {
-    fn handle_event(&mut self, _delta_time: f64, _event: &Event) -> bool {
+    fn handle_event(&mut self, _elapsed_time: f64, _event: &Event) -> bool {
         true
     }
 
-    fn run(&mut self, _delta_time: f64, cfg: &SdlConfiguration, painter: &mut dyn Painter) -> bool {
-        for y in 0 .. cfg.height() {
-            for x in 0 .. cfg.width() {
-                let r = 128_u8;
-                let g = (x & 0xFF) as u8;
-                let b = (y & 0xFF) as u8;
+    fn run(&mut self, _elapsed_time: f64, painter: &mut dyn Painter) -> bool {
+        if self.cnt > 0 && self.cnt < 128 {
+            self.cnt += self.dir;
+        }
+        else {
+            self.cnt -= self.dir;
+            self.dir = -self.dir;
+        }
+
+        for y in 0 .. SCR_HEIGHT {
+            for x in 0 .. SCR_WIDTH {
+                let r = (self.cnt & 0xFF) as u8; //+ fastrand::u8(0..64);
+                let g = ((x * 256 / SCR_WIDTH) & 0xFF) as u8;
+                let b = ((y * 256 / SCR_HEIGHT) & 0xFF) as u8;
                 painter.draw_pixel(x, y, RGB::from(r, g, b));
             }
         }

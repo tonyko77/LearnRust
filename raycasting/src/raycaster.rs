@@ -5,6 +5,8 @@
 
 /// `RayCaster` engine. Must be built using [`RayCasterBuilder`].
 pub struct RayCaster {
+    scr_width: u32,
+    scr_height: u32,
     map_width: u32,
     map_height: u32,
     map: Vec<u8>, // just 1s and 0s, for now (later, we can use texture indices instead of 1)
@@ -40,6 +42,8 @@ impl RayCasterBuilder {
     pub fn new() -> Self {
         RayCasterBuilder {
             0: RayCaster {
+                scr_width: 0,
+                scr_height: 0,
                 map_width: 0,
                 map_height: 0,
                 map: vec![],
@@ -50,16 +54,20 @@ impl RayCasterBuilder {
     }
 
     #[inline]
-    pub fn width(&mut self, w: u32) -> &mut Self {
+    pub fn map_size(&mut self, w: u32, h: u32) -> &mut Self {
         assert!(w > 0);
+        assert!(h > 0);
         self.0.map_width = w;
+        self.0.map_height = h;
         self
     }
 
     #[inline]
-    pub fn height(&mut self, h: u32) -> &mut Self {
+    pub fn scr_size(&mut self, w: u32, h: u32) -> &mut Self {
+        assert!(w > 0);
         assert!(h > 0);
-        self.0.map_height = h;
+        self.0.scr_width = w;
+        self.0.scr_height = h;
         self
     }
 
@@ -75,8 +83,8 @@ impl RayCasterBuilder {
         let mut idx = 0_usize;
         for ch in map_data.chars() {
             match ch {
-                '#' => { // wall
-                    self.0.map[idx] = 1;
+                'A'..='Z' => { // wall
+                    self.0.map[idx] = 1 + (ch as u8) - ('A' as u8);
                     idx += 1;
                 },
                 '.' => { // empty space

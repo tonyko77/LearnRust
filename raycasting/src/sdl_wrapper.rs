@@ -1,30 +1,24 @@
 //! SDL2 wrapper, to simplify using SDL2
 
 use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::pixels::PixelFormatEnum;
+use sdl2::surface::Surface;
 
 //use sdl2::Sdl;
 //use sdl2::render::TextureCreator;
 //use sdl2::video::Window;
-//use sdl2::render::Canvas;
-
-use sdl2::keyboard::Keycode;
+//use sdl2::render::{Canvas, RenderTarget};
 //use sdl2::render::Texture;
-
 //use sdl2::pixels::Color;
 //use sdl2::mouse::Cursor;
 //use sdl2::rect::Rect;
 //use sdl2::rect::Point;
 //use sdl2::surface::Surface;
-use sdl2::pixels::PixelFormatEnum;
 //use sdl2::video::WindowContext;
 
 use std::time::Instant;
-//use std::time::Duration;
-//use std::env;
-//use std::path::Path;
 
-
-const FPS_LOOPS: i32 = 200;
 
 
 #[derive(Clone, Copy)]
@@ -84,20 +78,14 @@ impl SdlConfiguration {
             pixel_size,
         }
     }
-
-    #[inline]
-    pub fn width(&self) -> u32 { self.width }
-
-    #[inline]
-    pub fn height(&self) -> u32 { self.height }
 }
 
 
 /// Must be implemented by whoever wants to use SDL
 pub trait GraphicsLoop {
-    fn handle_event(&mut self, delta_time: f64, event: &Event) -> bool;
+    fn handle_event(&mut self, elapsed_time: f64, event: &Event) -> bool;
 
-    fn run(&mut self, delta_time: f64, cfg: &SdlConfiguration, painter: &mut dyn Painter) -> bool;
+    fn run(&mut self, elapsed_time: f64, painter: &mut dyn Painter) -> bool;
 }
 
 
@@ -112,20 +100,19 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
 
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
-    let window = video_subsystem
+    let mut window = video_subsystem
         .window(&cfg.title, win_width, win_height)
         .position_centered()
         .opengl()
         .build()
         .map_err(|e| e.to_string())?;
-    let mut canvas =
-        window.into_canvas().build().map_err(|e| e.to_string())?;
 
-    // create texture, to paint on
-    let texture_creator = canvas.texture_creator();
-    let mut screen_buffer = texture_creator
-        .create_texture_streaming(PixelFormatEnum::RGB24, cfg.width, cfg.height)
-        .map_err(|e| e.to_string())?;
+    // let mut canvas =
+    //     window.into_canvas().build().map_err(|e| e.to_string())?;
+    // canvas.set_blend_mode(sdl2::render::BlendMode::None);
+
+    let mut srf = Surface::new(cfg.width, cfg.height, PixelFormatEnum::RGB24)?;
+
 
     // prepare for the loop
     let mut time_cnt = 0;
@@ -137,17 +124,17 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
     'running: loop {
         // compute time
         let next_moment = Instant::now();
-        let delta_time = next_moment.duration_since(moment).as_secs_f64();
+        let elapsed_time = next_moment.duration_since(moment).as_secs_f64();
         moment = next_moment;
         // compute FPS
-        time_sum += delta_time;
+        time_sum += elapsed_time;
         time_cnt += 1;
-        if time_cnt >= FPS_LOOPS {
+        if time_sum >= 1.0 {
             let avg = time_sum / (time_cnt as f64);
             let fps = if avg <= 0.0 { 999999.0 } else { 1.0 / avg };
             time_cnt = 0;
             time_sum = 0.0;
-            canvas.window_mut().set_title(format!("{} - FPS: {}", cfg.title, fps as usize).as_str()).unwrap();
+            window.set_title(format!("{} - FPS: {}", cfg.title, fps as usize).as_str()).unwrap();
         }
 
         // consume the event loop
@@ -159,7 +146,7 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
                     ..
                 } => break 'running,
                 _ => {
-                    if !gfx_loop.handle_event(delta_time, &event) {
+                    if !gfx_loop.handle_event(elapsed_time, &event) {
                         break 'running;
                     }
                 }
@@ -167,22 +154,20 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         }
 
         // draw stuff
-        // improved this using SDL textures:
-        // - see: https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/renderer-texture.rs
-        // - see: https://www.reddit.com/r/cpp_questions/comments/eqwsao/sdl_rendering_way_too_slow/
-        let mut ok = true;
-        screen_buffer.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-            // all painting must be done in this closure
+        let mut ok_to_continue = true;
+        srf.with_lock_mut(|buffer: &mut [u8]| {
+            let pitch = (cfg.width * 3) as usize;
             let mut itp = InternalTexturePainter { buffer, pitch, cfg };
-            ok = gfx_loop.run(delta_time, cfg, &mut itp);
-        })?;
-        if !ok {
+            ok_to_continue = gfx_loop.run(elapsed_time, &mut itp);
+        });
+        if !ok_to_continue {
             break 'running;
         }
 
-        // paint texture on screen
-        canvas.copy(&screen_buffer, None, None)?;
-        canvas.present();
+        let mut wndsrf = window.surface(&event_pump)?;
+        srf.blit_scaled(None, &mut wndsrf, None)?;
+        wndsrf.finish()?;
+
     }
 
     Ok(())
