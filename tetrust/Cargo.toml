@@ -6,6 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-rand = "0.8"
-#olc_pixel_game_engine = "0.5"
+fastrand = "1.9"
+sdl2 = "0.35"
+# TODO replace OLC with SDL !!
 olc_pixel_game_engine = { git = "https://github.com/sadikovi/olcPixelGameEngine-rs", branch = "master" }
+
+[profile.dev]
+# optimize only the dependencies
+#  - see https://docs.rust-embedded.org/book/unsorted/speed-vs-size.html#optimizing-dependencies
+opt-level = "z"

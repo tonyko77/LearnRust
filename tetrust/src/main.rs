@@ -1,5 +1,4 @@
 use olc_pixel_game_engine as olc;
-use rand::Rng;
 
 const SCREEN_WIDTH:i32 = 320;
 const SCREEN_HEIGHT:i32 = 240;
@@ -23,12 +22,11 @@ impl olc::Application for ExampleProgram {
     //olc::clear(olc::BLACK);
 
     // (TONI) draws random pixels
-    let mut rng = rand::thread_rng();
     for y in 0..SCREEN_HEIGHT {
         for x in 0..SCREEN_WIDTH {
-            let r: u8 = rng.gen_range(0..=255);
-            let g: u8 = rng.gen_range(0..=255);
-            let b: u8 = rng.gen_range(0..=255);
+            let r: u8 = fastrand::u8(0..=255);
+            let g: u8 = fastrand::u8(0..=255);
+            let b: u8 = fastrand::u8(0..=255);
             let p = olc::Pixel { r, g, b, a: 255 };
             olc::draw(x, y, p);
         }

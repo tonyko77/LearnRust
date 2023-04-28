@@ -3,7 +3,6 @@
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
-use sdl2::surface::Surface;
 
 use std::time::{Instant, Duration};
 
@@ -85,28 +84,35 @@ pub trait GraphicsLoop {
 }
 
 
-
 /// Main function to run the continuous SDL loop
 pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> Result<(), String> {
     assert!(cfg.width > 0);
     assert!(cfg.height > 0);
     assert!(cfg.pixel_size > 0);
+
+    // create window
     let win_width = cfg.width * cfg.pixel_size;
     let win_height = cfg.height * cfg.pixel_size;
-
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
-    let mut window = video_subsystem
+    let window = video_subsystem
         .window(&cfg.title, win_width, win_height)
         .position_centered()
         .opengl()
         .build()
         .map_err(|e| e.to_string())?;
+    let mut canvas =
+        window.into_canvas().build().map_err(|e| e.to_string())?;
+
+    // create texture, to paint on
+    let texture_creator = canvas.texture_creator();
+    let mut screen_buffer = texture_creator
+        .create_texture_streaming(PixelFormatEnum::RGB24, cfg.width, cfg.height)
+        .map_err(|e| e.to_string())?;
 
     let mut timer = FpsAndElapsedCounter::new();
-    let mut last_fps = 0;
+    let mut last_fps = 42;
     let mut event_pump = sdl_context.event_pump()?;
-    let mut paint_surface = Surface::new(cfg.width, cfg.height, PixelFormatEnum::RGB24)?;
 
     // Main game loop
     'running: loop {
@@ -115,7 +121,7 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         if last_fps != timer.fps {
             last_fps = timer.fps;
             let title_with_fps = format!("{} - FPS: {}", cfg.title, last_fps);
-            window.set_title(&title_with_fps).map_err(|e| e.to_string())?;
+            canvas.window_mut().set_title(&title_with_fps).map_err(|e| e.to_string())?;
         }
 
         // consume the event loop
@@ -135,19 +141,22 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         }
 
         // draw stuff
-        let mut ok_to_continue = true;
-        paint_surface.with_lock_mut(|buffer: &mut [u8]| {
-            let pitch = (cfg.width * 3) as usize;
-            let mut itp = InternalTexturePainter { buffer, pitch, cfg };
-            ok_to_continue = gfx_loop.run(elapsed_time, &mut itp);
-        });
-        if !ok_to_continue {
+        // improved this using SDL textures:
+        // - see: https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/renderer-texture.rs
+        // - see: https://www.reddit.com/r/cpp_questions/comments/eqwsao/sdl_rendering_way_too_slow/
+        let mut ok = true;
+        screen_buffer.with_lock(None, |buffer: &mut [u8], pitch: usize| {
+            // all painting must be done in this closure
+            let mut painter = InternalTexturePainter { buffer, pitch, cfg };
+            ok = gfx_loop.run(elapsed_time, &mut painter);
+        })?;
+        if !ok {
             break 'running;
         }
 
-        let mut wndsrf = window.surface(&event_pump)?;
-        paint_surface.blit_scaled(None, &mut wndsrf, None)?;
-        wndsrf.finish()?;
+        // paint texture on screen
+        canvas.copy(&screen_buffer, None, None)?;
+        canvas.present();
 
         // sleep a bit, so we don't hog the CPU
         if cfg.should_sleep {
@@ -161,6 +170,24 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
 
 //--------------------------------
 // Internal details
+
+struct InternalTexturePainter<'a> {
+    buffer: &'a mut [u8],
+    pitch: usize,
+    cfg: &'a SdlConfiguration,
+}
+
+impl<'a> Painter for InternalTexturePainter<'a> {
+    fn draw_pixel(&mut self, x: u32, y: u32, color: RGB) {
+        if x < self.cfg.width && y < self.cfg.height {
+            let offset = (y as usize) * self.pitch + (x as usize) * 3;
+            self.buffer[offset + 0] = color.r;
+            self.buffer[offset + 1] = color.g;
+            self.buffer[offset + 2] = color.b;
+        }
+    }
+}
+
 
 struct FpsAndElapsedCounter {
     time_sum: f64,
@@ -196,23 +223,5 @@ impl FpsAndElapsedCounter {
         }
 
         elapsed_time
-    }
-}
-
-
-struct InternalTexturePainter<'a> {
-    buffer: &'a mut [u8],
-    pitch: usize,
-    cfg: &'a SdlConfiguration,
-}
-
-impl<'a> Painter for InternalTexturePainter<'a> {
-    fn draw_pixel(&mut self, x: u32, y: u32, color: RGB) {
-        if x < self.cfg.width && y < self.cfg.height {
-            let offset = (y as usize) * self.pitch + (x as usize) * 3;
-            self.buffer[offset + 0] = color.r;
-            self.buffer[offset + 1] = color.g;
-            self.buffer[offset + 2] = color.b;
-        }
     }
 }

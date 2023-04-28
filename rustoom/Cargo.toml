@@ -9,5 +9,7 @@ edition = "2021"
 fastrand = "1.9"
 sdl2 = "0.35"
 
-# temporary import, until I learn how to use SDL2 :))
-#olc_pixel_game_engine = { git = "https://github.com/sadikovi/olcPixelGameEngine-rs", branch = "master" }
+[profile.dev]
+# optimize only the dependencies
+#  - see https://docs.rust-embedded.org/book/unsorted/speed-vs-size.html#optimizing-dependencies
+opt-level = "z"

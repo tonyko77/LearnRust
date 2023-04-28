@@ -18,11 +18,11 @@ const MAP: &'static str = concat!(
     "AAAAAAAAAA",
 );
 
-const SCR_WIDTH: u32 = 800;
-const SCR_HEIGHT: u32 = 400;
-const PIXEL_SIZE: u32 = 1;
+const SCR_WIDTH: u32 = 320;
+const SCR_HEIGHT: u32 = 240;
+const PIXEL_SIZE: u32 = 3;
 
-const SLEEP_MS: u32 = 1;
+const SLEEP_MS: u32 = 0;
 
 //------------------------------------
 
@@ -76,9 +76,12 @@ impl GraphicsLoop for Demo {
 
         for y in 0 .. SCR_HEIGHT {
             for x in 0 .. SCR_WIDTH {
-                let r = (self.cnt & 0x7F) as u8; // + fastrand::u8(0..64);
-                let g = ((x * 256 / SCR_WIDTH) & 0xFF) as u8;
-                let b = ((y * 256 / SCR_HEIGHT) & 0xFF) as u8;
+                // let r = (self.cnt & 0x7F) as u8; // + fastrand::u8(0..64);
+                // let g = ((x * 256 / SCR_WIDTH) & 0xFF) as u8;
+                // let b = ((y * 256 / SCR_HEIGHT) & 0xFF) as u8;
+                let r = fastrand::u8(0..=255);
+                let g = fastrand::u8(0..=255);
+                let b = fastrand::u8(0..=255);
                 painter.draw_pixel(x, y, RGB::from(r, g, b));
             }
         }
