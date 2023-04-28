@@ -22,6 +22,8 @@ const SCR_WIDTH: u32 = 800;
 const SCR_HEIGHT: u32 = 400;
 const PIXEL_SIZE: u32 = 1;
 
+const SLEEP_MS: u32 = 1;
+
 //------------------------------------
 
 fn main() {
@@ -30,13 +32,14 @@ fn main() {
         .scr_size(SCR_WIDTH, SCR_HEIGHT)
         .map_size(MAP_WIDTH, MAP_HEIGHT)
         .map_from_str(MAP);
-    let raycaster = builder.build();
+    let _raycaster = builder.build(); // TODO use this !!!
 
     let sdl_config = SdlConfiguration::new(
         "Ray Caster Demo",
         SCR_WIDTH,
         SCR_HEIGHT,
-        PIXEL_SIZE);
+        PIXEL_SIZE,
+        SLEEP_MS);
 
     // main game loop
     let mut demo = Demo { cnt: 1, dir: 1, };
@@ -73,7 +76,7 @@ impl GraphicsLoop for Demo {
 
         for y in 0 .. SCR_HEIGHT {
             for x in 0 .. SCR_WIDTH {
-                let r = (self.cnt & 0xFF) as u8; //+ fastrand::u8(0..64);
+                let r = (self.cnt & 0x7F) as u8; // + fastrand::u8(0..64);
                 let g = ((x * 256 / SCR_WIDTH) & 0xFF) as u8;
                 let b = ((y * 256 / SCR_HEIGHT) & 0xFF) as u8;
                 painter.draw_pixel(x, y, RGB::from(r, g, b));

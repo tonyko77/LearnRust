@@ -5,19 +5,7 @@ use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::surface::Surface;
 
-//use sdl2::Sdl;
-//use sdl2::render::TextureCreator;
-//use sdl2::video::Window;
-//use sdl2::render::{Canvas, RenderTarget};
-//use sdl2::render::Texture;
-//use sdl2::pixels::Color;
-//use sdl2::mouse::Cursor;
-//use sdl2::rect::Rect;
-//use sdl2::rect::Point;
-//use sdl2::surface::Surface;
-//use sdl2::video::WindowContext;
-
-use std::time::Instant;
+use std::time::{Instant, Duration};
 
 
 
@@ -32,6 +20,8 @@ impl RGB {
 }
 
 
+/// Painter interface, to be passed to client code so it can perform painting.
+/// *This is not meant to be implemented by client code.*
 pub trait Painter {
     fn draw_pixel(&mut self, x: u32, y: u32, color: RGB);
 
@@ -62,20 +52,26 @@ pub trait Painter {
 
 }
 
+
+/// The configuration to be used for initializing SDL.
 pub struct SdlConfiguration {
     title: String,
     width: u32,
     height: u32,
     pixel_size: u32,
+    should_sleep: bool,
+    sleep_duration: Duration,
 }
 
 impl SdlConfiguration {
-    pub fn new(title: &str, width: u32, height: u32, pixel_size: u32) -> Self {
+    pub fn new(title: &str, width: u32, height: u32, pixel_size: u32, sleep_ms: u32) -> Self {
         SdlConfiguration {
             title: String::from(title),
             width,
             height,
             pixel_size,
+            should_sleep: (sleep_ms > 0),
+            sleep_duration: Duration::from_millis(sleep_ms as u64),
         }
     }
 }
@@ -107,34 +103,19 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         .build()
         .map_err(|e| e.to_string())?;
 
-    // let mut canvas =
-    //     window.into_canvas().build().map_err(|e| e.to_string())?;
-    // canvas.set_blend_mode(sdl2::render::BlendMode::None);
-
-    let mut srf = Surface::new(cfg.width, cfg.height, PixelFormatEnum::RGB24)?;
-
-
-    // prepare for the loop
-    let mut time_cnt = 0;
-    let mut time_sum = 0.0_f64;
+    let mut timer = FpsAndElapsedCounter::new();
+    let mut last_fps = 0;
     let mut event_pump = sdl_context.event_pump()?;
-    let mut moment = Instant::now();
+    let mut paint_surface = Surface::new(cfg.width, cfg.height, PixelFormatEnum::RGB24)?;
 
-    // main game loop
+    // Main game loop
     'running: loop {
         // compute time
-        let next_moment = Instant::now();
-        let elapsed_time = next_moment.duration_since(moment).as_secs_f64();
-        moment = next_moment;
-        // compute FPS
-        time_sum += elapsed_time;
-        time_cnt += 1;
-        if time_sum >= 1.0 {
-            let avg = time_sum / (time_cnt as f64);
-            let fps = if avg <= 0.0 { 999999.0 } else { 1.0 / avg };
-            time_cnt = 0;
-            time_sum = 0.0;
-            window.set_title(format!("{} - FPS: {}", cfg.title, fps as usize).as_str()).unwrap();
+        let elapsed_time = timer.update_and_get_ellapsed_time();
+        if last_fps != timer.fps {
+            last_fps = timer.fps;
+            let title_with_fps = format!("{} - FPS: {}", cfg.title, last_fps);
+            window.set_title(&title_with_fps).map_err(|e| e.to_string())?;
         }
 
         // consume the event loop
@@ -155,7 +136,7 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
 
         // draw stuff
         let mut ok_to_continue = true;
-        srf.with_lock_mut(|buffer: &mut [u8]| {
+        paint_surface.with_lock_mut(|buffer: &mut [u8]| {
             let pitch = (cfg.width * 3) as usize;
             let mut itp = InternalTexturePainter { buffer, pitch, cfg };
             ok_to_continue = gfx_loop.run(elapsed_time, &mut itp);
@@ -165,12 +146,57 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         }
 
         let mut wndsrf = window.surface(&event_pump)?;
-        srf.blit_scaled(None, &mut wndsrf, None)?;
+        paint_surface.blit_scaled(None, &mut wndsrf, None)?;
         wndsrf.finish()?;
 
+        // sleep a bit, so we don't hog the CPU
+        if cfg.should_sleep {
+            std::thread::sleep(cfg.sleep_duration);
+        }
     }
 
     Ok(())
+}
+
+
+//--------------------------------
+// Internal details
+
+struct FpsAndElapsedCounter {
+    time_sum: f64,
+    time_cnt: u32,
+    fps: u32,
+    last_moment: Instant,
+}
+
+impl FpsAndElapsedCounter {
+    fn new() -> Self {
+        FpsAndElapsedCounter { 
+            time_cnt: 0,
+            time_sum: 0.0,
+            last_moment: Instant::now(),
+            fps: 0
+        }
+    }
+
+    fn update_and_get_ellapsed_time(&mut self) -> f64 {
+        // compute time
+        let next_moment = Instant::now();
+        let elapsed_time = next_moment.duration_since(self.last_moment).as_secs_f64();
+        self.last_moment = next_moment;
+
+        // compute FPS
+        self.time_sum += elapsed_time;
+        self.time_cnt += 1;
+        if self.time_sum >= 1.0 {
+            let avg = self.time_sum / (self.time_cnt as f64);
+            self.fps = if avg <= 0.0 { 999999 } else { (1.0 / avg) as u32 };
+            self.time_cnt = 0;
+            self.time_sum = 0.0;
+        }
+
+        elapsed_time
+    }
 }
 
 
