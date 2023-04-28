@@ -9,3 +9,6 @@ edition = "2021"
 #fastrand = "1.9"
 #sdl2 = { version = "0.35", features = ["unsafe_textures"] }
 sdl2 = "0.35"
+
+[profile.dev]
+opt-level = 1
