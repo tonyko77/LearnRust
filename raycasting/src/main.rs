@@ -18,11 +18,11 @@ const MAP: &'static str = concat!(
     "AAAAAAAAAA",
 );
 
-const SCR_WIDTH: u32 = 320;
-const SCR_HEIGHT: u32 = 240;
+const SCR_WIDTH: u32 = 400;
+const SCR_HEIGHT: u32 = 200;
 const PIXEL_SIZE: u32 = 3;
 
-const SLEEP_MS: u32 = 1;
+const SHOULD_SLEEP: bool = true;
 
 
 fn main() {
@@ -38,7 +38,7 @@ fn main() {
         SCR_WIDTH,
         SCR_HEIGHT,
         PIXEL_SIZE,
-        SLEEP_MS);
+        SHOULD_SLEEP);
 
     // main game loop
     let mut demo = RayCastingDemo::new(SCR_WIDTH, SCR_HEIGHT);

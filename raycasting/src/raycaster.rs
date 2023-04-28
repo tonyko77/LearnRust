@@ -1,6 +1,6 @@
 //! The ray casting engine/demo.
 
-use crate::{GraphicsLoop, Event, RGB, Painter};
+use crate::*;
 
 //-------------------------------------------------------
 
@@ -126,6 +126,7 @@ impl RayCasterBuilder {
 pub struct RayCastingDemo {
     scr_width: i32,
     scr_height: i32,
+    gen: i32,
 }
 
 
@@ -134,6 +135,7 @@ impl RayCastingDemo {
         RayCastingDemo {
             scr_width: width as i32,
             scr_height: height as i32,
+            gen: 0
         }
     }
 }
@@ -145,24 +147,30 @@ impl GraphicsLoop for RayCastingDemo {
     }
 
     fn run(&mut self, _elapsed_time: f64, painter: &mut dyn Painter) -> bool {
-        painter.draw_rect(0, 0,
-            self.scr_width, self.scr_height,
-            RGB::from(255, 0, 0));
-/*
-        let x1 = fastrand::u32(2 .. self.scr_width-2);
-        let y1 = fastrand::u32(2 .. self.scr_height-2);
-        let x2 = fastrand::u32(2 .. self.scr_width-2);
-        let y2 = fastrand::u32(2 .. self.scr_height-2);
+
+        let x = fastrand::i32(2 .. self.scr_width-30);
+        let y = fastrand::i32(2 .. self.scr_height-30);
+        let w = fastrand::i32(3 .. 30);
+        let h = fastrand::i32(3 .. 30);
 
         let r = fastrand::u8(0..=255);
         let g = fastrand::u8(0..=255);
         let b = fastrand::u8(0..=255);
         let color = RGB::from(r, g, b);
 
-        painter.draw_line(x1, y1, x2, y2, color);
- */
-        painter.draw_circle(50, 50, 140, RGB::from(0, 255, 0));
+        let modgen = self.gen % 7;
+        self.gen = (self.gen + 1) & 0xFFFF;
+        match modgen {
+            0 => { painter.draw_rect(x, y, w, h, color); },
+            1 => { painter.fill_rect(x, y, w, h, color); },
+            2 => { painter.draw_ellipse(x, y, w, h, color); },
+            3 => { painter.fill_ellipse(x, y, w, h, color); },
+            4 => { painter.draw_circle(x, y, w, color); },
+            5 => { painter.fill_circle(x, y, w, color); },
+            _ => { painter.draw_line(x, y, x+w, y+h, color); },
+        }
 
+        painter.draw_rect(0, 0, self.scr_width, self.scr_height, GREY);
 
         true
     }

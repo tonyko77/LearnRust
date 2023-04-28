@@ -9,6 +9,9 @@ use sdl2::pixels::PixelFormatEnum;
 use std::time::{Instant, Duration};
 
 
+const SLEEP_DURATION: Duration = Duration::from_micros(1);
+
+
 /// The configuration to be used for initializing SDL.
 pub struct SdlConfiguration {
     title: String,
@@ -16,18 +19,16 @@ pub struct SdlConfiguration {
     height: u32,
     pixel_size: u32,
     should_sleep: bool,
-    sleep_duration: Duration,
 }
 
 impl SdlConfiguration {
-    pub fn new(title: &str, width: u32, height: u32, pixel_size: u32, sleep_ms: u32) -> Self {
+    pub fn new(title: &str, width: u32, height: u32, pixel_size: u32, should_sleep: bool) -> Self {
         SdlConfiguration {
             title: String::from(title),
             width,
             height,
             pixel_size,
-            should_sleep: (sleep_ms > 0),
-            sleep_duration: Duration::from_millis(sleep_ms as u64),
+            should_sleep,
         }
     }
 }
@@ -122,7 +123,7 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
 
         // sleep a bit, so we don't hog the CPU
         if cfg.should_sleep {
-            std::thread::sleep(cfg.sleep_duration);
+            std::thread::sleep(SLEEP_DURATION);
         }
     }
 
