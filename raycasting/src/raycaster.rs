@@ -1,5 +1,6 @@
 //! The ray casting engine/demo.
 
+use crate::{GraphicsLoop, Event, RGB, Painter};
 
 //-------------------------------------------------------
 
@@ -116,4 +117,57 @@ impl RayCasterBuilder {
         self.0
     }
 
+}
+
+
+//-------------------------------------------------------
+
+/// Demo mini-game for ray casting.
+pub struct RayCastingDemo {
+    scr_width: u32,
+    scr_height: u32,
+    cnt: i32,
+    dir: i32,
+}
+
+
+impl RayCastingDemo {
+    pub fn new(scr_width: u32, scr_height: u32) -> Self {
+        RayCastingDemo {
+            scr_width,
+            scr_height,
+            cnt: 0,
+            dir: 1
+        }
+    }
+}
+
+
+impl GraphicsLoop for RayCastingDemo {
+    fn handle_event(&mut self, _elapsed_time: f64, _event: &Event) -> bool {
+        true
+    }
+
+    fn run(&mut self, _elapsed_time: f64, painter: &mut dyn Painter) -> bool {
+        if self.cnt > 0 && self.cnt < 128 {
+            self.cnt += self.dir;
+        }
+        else {
+            self.cnt -= self.dir;
+            self.dir = -self.dir;
+        }
+
+        for y in 0 .. self.scr_height {
+            for x in 0 .. self.scr_width {
+                // let r = (self.cnt & 0x7F) as u8; // + fastrand::u8(0..64);
+                // let g = ((x * 256 / SCR_WIDTH) & 0xFF) as u8;
+                // let b = ((y * 256 / SCR_HEIGHT) & 0xFF) as u8;
+                let r = fastrand::u8(0..=255);
+                let g = fastrand::u8(0..=255);
+                let b = fastrand::u8(0..=255);
+                painter.draw_pixel(x, y, RGB::from(r, g, b));
+            }
+        }
+        true
+    }
 }

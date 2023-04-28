@@ -1,11 +1,10 @@
 //! Main lib for the ray-casting engine/demo
 
-pub mod sdl_wrapper;
 pub mod raycaster;
+pub mod sdl_wrapper;
 
-pub use sdl_wrapper::{RGB, Painter, SdlConfiguration, GraphicsLoop, run_sdl_loop};
+pub use sdl_wrapper::{run_sdl_loop, GraphicsLoop, Painter, SdlConfiguration, RGB};
 
-pub use raycaster::RayCaster;
-pub use raycaster::RayCasterBuilder;
+pub use raycaster::{RayCaster, RayCasterBuilder, RayCastingDemo};
 
 pub use sdl2::event::Event;
