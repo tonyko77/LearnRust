@@ -124,20 +124,16 @@ impl RayCasterBuilder {
 
 /// Demo mini-game for ray casting.
 pub struct RayCastingDemo {
-    scr_width: u32,
-    scr_height: u32,
-    cnt: i32,
-    dir: i32,
+    scr_width: i32,
+    scr_height: i32,
 }
 
 
 impl RayCastingDemo {
-    pub fn new(scr_width: u32, scr_height: u32) -> Self {
+    pub fn new(width: u32, height: u32) -> Self {
         RayCastingDemo {
-            scr_width,
-            scr_height,
-            cnt: 0,
-            dir: 1
+            scr_width: width as i32,
+            scr_height: height as i32,
         }
     }
 }
@@ -149,25 +145,25 @@ impl GraphicsLoop for RayCastingDemo {
     }
 
     fn run(&mut self, _elapsed_time: f64, painter: &mut dyn Painter) -> bool {
-        if self.cnt > 0 && self.cnt < 128 {
-            self.cnt += self.dir;
-        }
-        else {
-            self.cnt -= self.dir;
-            self.dir = -self.dir;
-        }
+        painter.draw_rect(0, 0,
+            self.scr_width, self.scr_height,
+            RGB::from(255, 0, 0));
+/*
+        let x1 = fastrand::u32(2 .. self.scr_width-2);
+        let y1 = fastrand::u32(2 .. self.scr_height-2);
+        let x2 = fastrand::u32(2 .. self.scr_width-2);
+        let y2 = fastrand::u32(2 .. self.scr_height-2);
 
-        for y in 0 .. self.scr_height {
-            for x in 0 .. self.scr_width {
-                // let r = (self.cnt & 0x7F) as u8; // + fastrand::u8(0..64);
-                // let g = ((x * 256 / SCR_WIDTH) & 0xFF) as u8;
-                // let b = ((y * 256 / SCR_HEIGHT) & 0xFF) as u8;
-                let r = fastrand::u8(0..=255);
-                let g = fastrand::u8(0..=255);
-                let b = fastrand::u8(0..=255);
-                painter.draw_pixel(x, y, RGB::from(r, g, b));
-            }
-        }
+        let r = fastrand::u8(0..=255);
+        let g = fastrand::u8(0..=255);
+        let b = fastrand::u8(0..=255);
+        let color = RGB::from(r, g, b);
+
+        painter.draw_line(x1, y1, x2, y2, color);
+ */
+        painter.draw_circle(50, 50, 140, RGB::from(0, 255, 0));
+
+
         true
     }
 }

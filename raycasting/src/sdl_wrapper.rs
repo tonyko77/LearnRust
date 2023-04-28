@@ -1,55 +1,12 @@
 //! SDL2 wrapper, to simplify using SDL2
 
+use crate::painter::*;
+
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 
 use std::time::{Instant, Duration};
-
-
-
-#[derive(Clone, Copy)]
-pub struct RGB { r: u8, g: u8, b: u8 }
-
-impl RGB {
-    #[inline]
-    pub fn from(r: u8, g: u8, b: u8) -> Self {
-        RGB { r, g, b }
-    }
-}
-
-
-/// Painter interface, to be passed to client code so it can perform painting.
-/// *This is not meant to be implemented by client code.*
-pub trait Painter {
-    fn draw_pixel(&mut self, x: u32, y: u32, color: RGB);
-
-    fn draw_rect(&mut self, x: u32, y: u32, w: u32, h: u32, color: RGB) {
-        if w > 0 && h > 0 {
-            let x2 = x + w - 1;
-            let y2 = y + h - 1;
-            for xx in x..=x2 {
-                self.draw_pixel(xx, y, color);
-                self.draw_pixel(xx, y2, color);
-            }
-            for yy in (y+1)..y2 {
-                self.draw_pixel(x, yy, color);
-                self.draw_pixel(x2, yy, color);
-            }
-        }
-    }
-
-    fn fill_rect(&mut self, x: u32, y: u32, w: u32, h: u32, color: RGB) {
-        if w > 0 && h > 0 {
-            for yy in y .. (y+h) {
-                for xx in x .. (x+w) {
-                    self.draw_pixel(xx, yy, color);
-                }
-            }
-        }
-    }
-
-}
 
 
 /// The configuration to be used for initializing SDL.
@@ -147,7 +104,12 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         let mut ok = true;
         screen_buffer.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             // all painting must be done in this closure
-            let mut painter = InternalTexturePainter { buffer, pitch, cfg };
+            let mut painter = InternalTexturePainter {
+                buffer,
+                pitch,
+                scr_width: cfg.width as i32,
+                scr_height: cfg.height as i32,
+            };
             ok = gfx_loop.run(elapsed_time, &mut painter);
         })?;
         if !ok {
@@ -174,12 +136,13 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
 struct InternalTexturePainter<'a> {
     buffer: &'a mut [u8],
     pitch: usize,
-    cfg: &'a SdlConfiguration,
+    scr_width: i32,
+    scr_height: i32,
 }
 
 impl<'a> Painter for InternalTexturePainter<'a> {
-    fn draw_pixel(&mut self, x: u32, y: u32, color: RGB) {
-        if x < self.cfg.width && y < self.cfg.height {
+    fn draw_pixel(&mut self, x: i32, y: i32, color: RGB) {
+        if x >= 0 && y >= 0 && x < self.scr_width && y < self.scr_height {
             let offset = (y as usize) * self.pitch + (x as usize) * 3;
             self.buffer[offset + 0] = color.r;
             self.buffer[offset + 1] = color.g;

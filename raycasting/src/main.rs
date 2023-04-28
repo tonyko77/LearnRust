@@ -21,7 +21,8 @@ const MAP: &'static str = concat!(
 const SCR_WIDTH: u32 = 320;
 const SCR_HEIGHT: u32 = 240;
 const PIXEL_SIZE: u32 = 3;
-const SLEEP_MS: u32 = 0;
+
+const SLEEP_MS: u32 = 1;
 
 
 fn main() {
