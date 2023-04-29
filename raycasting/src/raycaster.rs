@@ -6,21 +6,15 @@ use sdl2::keyboard::*;
 
 // constants for converting degrees to radians
 const FULL_CIRCLE: f64 = std::f64::consts::PI / 180.0; 
-// const CIRCLE_1_8: f64 = FULL_CIRCLE / 8.0; 
-// const CIRCLE_1_4: f64 = FULL_CIRCLE / 4.0; 
-// const CIRCLE_3_8: f64 = CIRCLE_1_4 + CIRCLE_1_8;
-// const CIRCLE_1_2: f64 = FULL_CIRCLE / 2.0; 
-// const CIRCLE_5_8: f64 = CIRCLE_1_2 + CIRCLE_1_8;
-// const CIRCLE_3_4: f64 = CIRCLE_1_2 + CIRCLE_1_4;
-// const CIRCLE_7_8: f64 = FULL_CIRCLE - CIRCLE_1_8;
 
 // TO BE ADJUSTED
 const MINI_MAP_WIDTH_PERCENT: u32 = 40;
 const WALK_SPEED: f64 = 4.0;
 const STRAFE_SPEED: f64 = WALK_SPEED;
 const ROTATE_SPEED: f64 = 150.0;
-//const MIN_DISTANCE_TO_WALL: f64 = 0.2;
+const MIN_DISTANCE_TO_WALL: f64 = 0.1;
 const MINIMAP_DIRECTION_LEN: f64 = 10.0;
+//const HALF_HORIZ_FOV: f64 = 45.0;
 
 const     DO_WALK_FWD: u32 = 0x0001;
 const    DO_WALK_BACK: u32 = 0x0002;
@@ -32,6 +26,9 @@ const    DO_ROT_RIGHT: u32 = 0x0020;
 //const          DO_USE: u32 = 0x0080;
 //const        DO_SHOOT: u32 = 0x0100;
 
+const MAP_EMPTY: u8 = 0;
+const MAP_EDGE: u8 = u8::MAX;
+
 const WALL_COLORS: &[RGB] = &[
     MAGENTA,
     BROWN,
@@ -41,7 +38,6 @@ const WALL_COLORS: &[RGB] = &[
     YELLOW,
     BLUE,
 ];
-
 const WALL_SHADINGS: &[u32] = &[100, 80, 50, 70];
 
 
@@ -68,24 +64,64 @@ pub struct RayCaster {
 
 impl RayCaster {
     pub fn walk(&mut self, distance: f64) {
-        self.pos_x += self.pdx * distance;
-        self.pos_y += self.pdy * distance;
-
-        //TODO also take care of keeping some distance to any wall
+        self.move_and_keep_away_from_obstacles(distance, self.pdx, self.pdy);
     }
 
     pub fn strafe(&mut self, distance: f64) {
         // "fake" strafing by swapping pdx and pdy + changing the sign for the Y direction
-        self.pos_x += self.pdy * distance;
-        self.pos_y -= self.pdx * distance;
-
-        //TODO also take care of keeping some distance to any wall
+        self.move_and_keep_away_from_obstacles(distance, self.pdy, -self.pdx);
     }
 
     pub fn rotate(&mut self, rotation_degrees: f64) {
         self.pos_angle = add_angles_in_degrees(self.pos_angle, rotation_degrees);
         self.pdx = (self.pos_angle * FULL_CIRCLE).cos();
         self.pdy = (self.pos_angle * FULL_CIRCLE).sin();
+    }
+
+
+    fn move_and_keep_away_from_obstacles(&mut self, distance: f64, pdx: f64, pdy: f64) {
+        let w = self.map_width as i32;
+        let h = self.map_height as i32;
+
+        // move + check collision on X
+        let move_x = pdx * distance;
+        self.pos_x += move_x;
+        let xx = if move_x < 0.0 {
+            (self.pos_x - MIN_DISTANCE_TO_WALL) as i32
+        } else {
+            (self.pos_x + MIN_DISTANCE_TO_WALL) as i32
+        };
+        let coll_x = (xx < 0) || (xx >= w) || {
+            let yl = (self.pos_y - MIN_DISTANCE_TO_WALL) as i32;
+            let yh = (self.pos_y + MIN_DISTANCE_TO_WALL) as i32;
+            yl < 0 || yh >= h ||
+            self.map[(yl * w + xx) as usize] != MAP_EMPTY ||
+            self.map[(yh * w + xx) as usize] != MAP_EMPTY
+        };
+        if coll_x {
+            // collision on X => restore X coordinate
+            self.pos_x -= move_x;
+        }
+
+        // move + check collision on Y
+        let move_y = pdy * distance;
+        self.pos_y += move_y;
+        let yy = if move_y < 0.0 {
+            (self.pos_y - MIN_DISTANCE_TO_WALL) as i32
+        } else {
+            (self.pos_y + MIN_DISTANCE_TO_WALL) as i32
+        };
+        let coll_y = (yy < 0) || (yy >= h) || {
+            let xl = (self.pos_x - MIN_DISTANCE_TO_WALL) as i32;
+            let xh = (self.pos_x + MIN_DISTANCE_TO_WALL) as i32;
+            xl < 0 || xh >= w ||
+            self.map[(yy * w + xl) as usize] != MAP_EMPTY ||
+            self.map[(yy * w + xh) as usize] != MAP_EMPTY
+        };
+        if coll_y {
+            // collision on Y => restore Y coordinate
+            self.pos_y -= move_y;
+        }
     }
 
 
@@ -125,7 +161,7 @@ impl RayCaster {
 
         // cast rays to draw the walls
         //self.cast_and_draw_ray(0.0, self.view_x + self.view_width / 2);
-        // TODO only one ray 4 now 
+        // TODO only one ray for now 
         let delta_angle = 0.0;
         let angle = add_angles_in_degrees(self.pos_angle, delta_angle);
         let (dist, wall, orientation) = self.compute_ray(angle);
@@ -137,7 +173,7 @@ impl RayCaster {
         painter.draw_line(px, py, px + ray_x, py + ray_y, color);
 
         // draw the result of the ray cast on the 3D view
-        //TODO println!("Angle: {angle}");
+        // TODO ...
 
 
         // after the rays, draw the player on the mini map
@@ -178,8 +214,8 @@ impl RayCaster {
                 else if angle < 180.0 { (-1, -1) }
                 else { (1, -1) };
 
-            // TODO
-            self.compute_orthogonal_ray(1, 0, 3)
+            // !! TODO implement this !!
+            (0.0, 0, 0)
         }
     }
 
@@ -258,18 +294,18 @@ impl RayCaster {
     }
 
     #[inline]
-    fn get_wall_color(wall_idx: u8, orientation: u8) -> RGB {
-        if wall_idx == 0 {
-            return BLACK;
+    fn get_wall_color(wall: u8, orientation: u8) -> RGB {
+        if wall == MAP_EMPTY || wall == MAP_EDGE {
+            BLACK
         }
-
-        let color = WALL_COLORS[(wall_idx as usize) % WALL_COLORS.len()];
-        let shading = WALL_SHADINGS[(orientation as usize) % WALL_SHADINGS.len()];
-
-        RGB {
-            r: Self::shade_wall_color(color.r, shading),
-            g: Self::shade_wall_color(color.g, shading),
-            b: Self::shade_wall_color(color.b, shading),
+        else {
+            let color = WALL_COLORS[(wall as usize) % WALL_COLORS.len()];
+            let shading = WALL_SHADINGS[(orientation as usize) % WALL_SHADINGS.len()];
+            RGB {
+                r: Self::shade_wall_color(color.r, shading),
+                g: Self::shade_wall_color(color.g, shading),
+                b: Self::shade_wall_color(color.b, shading),
+            }
         }
     }
 
@@ -417,7 +453,7 @@ impl RayCasterBuilder {
                     idx += 1;
                 },
                 '.' => { // empty space
-                    self.0.map[idx] = 0;
+                    self.0.map[idx] = MAP_EMPTY;
                     idx += 1;
                 },
                 '@' => { // player position
