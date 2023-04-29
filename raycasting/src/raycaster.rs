@@ -5,7 +5,7 @@ use sdl2::keyboard::*;
 
 
 // constants for converting degrees to radians
-// const FULL_CIRCLE: f64 = std::f64::consts::PI / 180.0; 
+const FULL_CIRCLE: f64 = std::f64::consts::PI / 180.0; 
 // const CIRCLE_1_8: f64 = FULL_CIRCLE / 8.0; 
 // const CIRCLE_1_4: f64 = FULL_CIRCLE / 4.0; 
 // const CIRCLE_3_8: f64 = CIRCLE_1_4 + CIRCLE_1_8;
@@ -18,15 +18,31 @@ use sdl2::keyboard::*;
 const MINI_MAP_WIDTH_PERCENT: u32 = 40;
 const WALK_SPEED: f64 = 4.0;
 const STRAFE_SPEED: f64 = WALK_SPEED;
-const ROTATE_SPEED: f64 = 1.0;
-const MIN_DISTANCE_TO_WALL: f64 = 0.2;
+const ROTATE_SPEED: f64 = 150.0;
+//const MIN_DISTANCE_TO_WALL: f64 = 0.2;
+const MINIMAP_DIRECTION_LEN: f64 = 10.0;
 
-const     KEY_WALK_FWD: u32 = 0x01;
-const    KEY_WALK_BACK: u32 = 0x02;
-const  KEY_STRAFE_LEFT: u32 = 0x04;
-const KEY_STRAFE_RIGHT: u32 = 0x08;
-const     KEY_ROT_LEFT: u32 = 0x10;
-const    KEY_ROT_RIGHT: u32 = 0x20;
+const     DO_WALK_FWD: u32 = 0x0001;
+const    DO_WALK_BACK: u32 = 0x0002;
+const  DO_STRAFE_LEFT: u32 = 0x0004;
+const DO_STRAFE_RIGHT: u32 = 0x0008;
+const     DO_ROT_LEFT: u32 = 0x0010;
+const    DO_ROT_RIGHT: u32 = 0x0020;
+//const          DO_RUN: u32 = 0x0040;
+//const          DO_USE: u32 = 0x0080;
+//const        DO_SHOOT: u32 = 0x0100;
+
+const WALL_COLORS: &[RGB] = &[
+    MAGENTA,
+    BROWN,
+    CYAN,
+    RED,
+    GREEN,
+    YELLOW,
+    BLUE,
+];
+
+const WALL_SHADINGS: &[u32] = &[100, 80, 50, 70];
 
 
 /// `RayCaster` engine. Must be built using [`RayCasterBuilder`].
@@ -39,6 +55,8 @@ pub struct RayCaster {
     pos_x: f64,
     pos_y: f64,
     pos_angle: f64, // angle in DEGREES
+    pdx: f64,
+    pdy: f64,
     mini_map_side: i32,
     view_x: i32,
     view_y: i32,
@@ -50,89 +68,37 @@ pub struct RayCaster {
 
 impl RayCaster {
     pub fn walk(&mut self, distance: f64) {
-        //TODO println!("TODO move forward/backward -> {distance}");
-        self.pos_y -= distance; // TODO fake !!
+        self.pos_x += self.pdx * distance;
+        self.pos_y += self.pdy * distance;
+
         //TODO also take care of keeping some distance to any wall
     }
 
     pub fn strafe(&mut self, distance: f64) {
-        //TODO println!("TODO strafe left/right -> {distance}");
-        self.pos_x -= distance; // TODO fake !!
+        // "fake" strafing by swapping pdx and pdy + changing the sign for the Y direction
+        self.pos_x += self.pdy * distance;
+        self.pos_y -= self.pdx * distance;
+
+        //TODO also take care of keeping some distance to any wall
     }
 
     pub fn rotate(&mut self, rotation_degrees: f64) {
         self.pos_angle = add_angles_in_degrees(self.pos_angle, rotation_degrees);
-    }
-
-    /// Cast one ray, from the player position, at a given delta angle compared to the player position.
-    /// Returns: (distance to wall, wall color index, wall orientation(0=N, 1=W, 2=S, 3=E))
-    pub fn cast_ray(&self, delta_angle: f64) -> (f64, i32, i32) {
-        let angle = add_angles_in_degrees(self.pos_angle, delta_angle);
-        let orientation = 3;
-
-        let mut distance: f64 = 0.0;
-
-        println!("TODO Implement ray casting !!!");
-
-        (distance, 0, orientation)
-    }
-
-
-    #[inline]
-    fn is_key_pressed(&self, flag: u32) -> bool {
-        (self.keys & flag) != 0
-    }
-
-    #[inline]
-    fn handle_key_down(&mut self, key: &Keycode) {
-        match *key {
-            Keycode::W => self.keys |= KEY_WALK_FWD,
-            Keycode::S => self.keys |= KEY_WALK_BACK,
-            Keycode::A => self.keys |= KEY_STRAFE_LEFT,
-            Keycode::D => self.keys |= KEY_STRAFE_RIGHT,
-            Keycode::Q => self.keys |= KEY_ROT_LEFT,
-            Keycode::E => self.keys |= KEY_ROT_RIGHT,
-            _ => { } 
-        }
-    }
-
-    #[inline]
-    fn handle_key_up(&mut self, key: &Keycode) {
-        match *key {
-            Keycode::W => self.keys &= !KEY_WALK_FWD,
-            Keycode::S => self.keys &= !KEY_WALK_BACK,
-            Keycode::A => self.keys &= !KEY_STRAFE_LEFT,
-            Keycode::D => self.keys &= !KEY_STRAFE_RIGHT,
-            Keycode::Q => self.keys &= !KEY_ROT_LEFT,
-            Keycode::E => self.keys &= !KEY_ROT_RIGHT,
-            _ => { } 
-        }
+        self.pdx = (self.pos_angle * FULL_CIRCLE).cos();
+        self.pdy = (self.pos_angle * FULL_CIRCLE).sin();
     }
 
 
     fn draw_mini_map(&self, painter: &mut dyn Painter) {
-        // draw mini map
         let ms = self.mini_map_side;
         for x in 0..self.map_width as i32 {
             for y in 0..self.map_height as i32 {
-                painter.draw_rect(x * ms, y * ms, ms + 1, ms + 1, DARK_GREY);
                 let idx = (y * (self.map_width as i32) + x) as usize;
-                let cell = self.map[idx];
-                // TODO use various colors for walls ...
-                let color = if cell == 0 { BLACK } else { WHITE };
+                let color = Self::get_wall_color(self.map[idx], 0);
                 painter.fill_rect(x * ms + 1, y * ms + 1, ms - 1, ms - 1, color);
             }
         }
-
-        // draw the player on the mini map
-        let px = (self.pos_x * (ms as f64)) as i32;
-        let py = (self.pos_y * (ms as f64)) as i32;
-        painter.fill_circle(px, py, 2, LIGHT_YELLOW);
-
-        // draw the player's direction
-        // TODO ...
     }
-
 
     fn draw_3d_view(&self, painter: &mut dyn Painter) {
         let width = self.scr_width as i32;
@@ -149,9 +115,167 @@ impl RayCaster {
                 self.view_height - y + self.view_y,
                 RGB::from(shade_down, shade_down, shade_down));
         }
+    }
+
+    fn draw_rays(&self, painter: &mut dyn Painter) {
+        // player position on the mini map
+        let ms = self.mini_map_side;
+        let px = (self.pos_x * (ms as f64)) as i32;
+        let py = (self.pos_y * (ms as f64)) as i32;
 
         // cast rays to draw the walls
-        // TODO ...
+        //self.cast_and_draw_ray(0.0, self.view_x + self.view_width / 2);
+        // TODO only one ray 4 now 
+        let delta_angle = 0.0;
+        let angle = add_angles_in_degrees(self.pos_angle, delta_angle);
+        let (dist, wall, orientation) = self.compute_ray(angle);
+        let color = Self::get_wall_color(wall, orientation);
+
+        // draw the ray on the mini map
+        let ray_x = ((angle * FULL_CIRCLE).cos() * dist * (ms as f64)) as i32;
+        let ray_y = ((angle * FULL_CIRCLE).sin() * dist * (ms as f64)) as i32;
+        painter.draw_line(px, py, px + ray_x, py + ray_y, color);
+
+        // draw the result of the ray cast on the 3D view
+        //TODO println!("Angle: {angle}");
+
+
+        // after the rays, draw the player on the mini map
+        // (so it appears over the rays)
+        painter.fill_circle(px, py, 2, LIGHT_YELLOW);
+        // draw the player's direction
+        let dirx = (self.pdx * MINIMAP_DIRECTION_LEN) as i32;
+        let diry = (self.pdy * MINIMAP_DIRECTION_LEN) as i32;
+        painter.draw_line(px, py, px + dirx, py + diry, ORANGE);
+    }
+
+    /// Computes: distance to wall, wall color index, wall orientation(0=N, 1=W, 2=S, 3=E)
+    fn compute_ray(&self, angle: f64) -> (f64, u8, u8) {
+        if angle > 359.9 || angle < 0.1 {
+            // looking east
+            self.compute_orthogonal_ray(1, 0, 3)
+        }
+        else if angle > 89.9 && angle < 90.1 {
+            // looking south (IMPORTANT: Y axis is pointing DOWN)
+            self.compute_orthogonal_ray(0, 1, 2)
+        }
+        else if angle > 179.9 && angle < 180.1 {
+            // looking west
+            self.compute_orthogonal_ray(-1, 0, 1)
+        }
+        else if angle > 269.9 && angle < 270.1 {
+            // looking north (IMPORTANT: Y axis is pointing DOWN)
+            self.compute_orthogonal_ray(0, -1, 0)
+        }
+        else {
+            // looking at an angle => safe to use tan()
+            let atan = -1.0 / angle.tan();
+
+            // compute directions
+            let (dx, dy) = 
+                if angle < 90.0 { (1, 1) }
+                else if angle < 180.0 { (-1, 1) }
+                else if angle < 180.0 { (-1, -1) }
+                else { (1, -1) };
+
+            // TODO
+            self.compute_orthogonal_ray(1, 0, 3)
+        }
+    }
+
+    fn compute_orthogonal_ray(&self, dx: i32, dy: i32, orientation: u8) -> (f64, u8, u8) {
+        let mut x = (self.pos_x) as i32;
+        let mut y = (self.pos_y) as i32;
+
+        let mut dist: f64 =
+            if dy == 0 {
+                if dx < 0 {
+                    self.pos_x - (x as f64)
+                }
+                else {
+                    ((x + 1) as f64) - self.pos_x
+                }
+            }
+            else {
+                if dy < 0 {
+                    self.pos_y - (y as f64)
+                }
+                else {
+                    ((y + 1) as f64) - self.pos_y
+                }
+            };
+
+        let mut wall: u8 = 0;
+        let w = self.map_width as i32;
+        let h = self.map_height as i32;
+        x += dx;
+        y += dy;
+
+        while x >= 0 && x < w && y >= 0 && y < h {
+            let idx = (y * w + x) as usize;
+            wall = self.map[idx];
+            if wall > 0 {
+                break;
+            }
+            dist += 1.0;
+            x += dx;
+            y += dy;
+        }
+
+        (dist, wall, orientation)
+    }
+
+
+    #[inline]
+    fn is_key_pressed(&self, flag: u32) -> bool {
+        (self.keys & flag) != 0
+    }
+
+    #[inline]
+    fn handle_key_down(&mut self, key: &Keycode) {
+        match *key {
+            Keycode::W => self.keys |= DO_WALK_FWD,
+            Keycode::S => self.keys |= DO_WALK_BACK,
+            Keycode::A => self.keys |= DO_STRAFE_LEFT,
+            Keycode::D => self.keys |= DO_STRAFE_RIGHT,
+            Keycode::Q => self.keys |= DO_ROT_LEFT,
+            Keycode::E => self.keys |= DO_ROT_RIGHT,
+            _ => { } 
+        }
+    }
+
+    #[inline]
+    fn handle_key_up(&mut self, key: &Keycode) {
+        match *key {
+            Keycode::W => self.keys &= !DO_WALK_FWD,
+            Keycode::S => self.keys &= !DO_WALK_BACK,
+            Keycode::A => self.keys &= !DO_STRAFE_LEFT,
+            Keycode::D => self.keys &= !DO_STRAFE_RIGHT,
+            Keycode::Q => self.keys &= !DO_ROT_LEFT,
+            Keycode::E => self.keys &= !DO_ROT_RIGHT,
+            _ => { } 
+        }
+    }
+
+    #[inline]
+    fn get_wall_color(wall_idx: u8, orientation: u8) -> RGB {
+        if wall_idx == 0 {
+            return BLACK;
+        }
+
+        let color = WALL_COLORS[(wall_idx as usize) % WALL_COLORS.len()];
+        let shading = WALL_SHADINGS[(orientation as usize) % WALL_SHADINGS.len()];
+
+        RGB {
+            r: Self::shade_wall_color(color.r, shading),
+            g: Self::shade_wall_color(color.g, shading),
+            b: Self::shade_wall_color(color.b, shading),
+        }
+    }
+
+    #[inline]
+    fn shade_wall_color(rgb: u8, shading: u32) -> u8 {
+        ((rgb as u32) * shading / 100) as u8
     }
 }
 
@@ -190,25 +314,25 @@ impl GraphicsLoop for RayCaster {
 
     fn update_state(&mut self, elapsed_time: f64) -> bool {
         // handle movement
-        if self.is_key_pressed(KEY_WALK_FWD) {
+        if self.is_key_pressed(DO_WALK_FWD) {
             self.walk(elapsed_time * WALK_SPEED);
         }
-        if self.is_key_pressed(KEY_WALK_BACK) {
+        if self.is_key_pressed(DO_WALK_BACK) {
             self.walk(-elapsed_time * WALK_SPEED);
         }
 
-        if self.is_key_pressed(KEY_STRAFE_LEFT) {
+        if self.is_key_pressed(DO_STRAFE_LEFT) {
             self.strafe(elapsed_time * STRAFE_SPEED);
         }
-        if self.is_key_pressed(KEY_STRAFE_RIGHT) {
+        if self.is_key_pressed(DO_STRAFE_RIGHT) {
             self.strafe(-elapsed_time * STRAFE_SPEED);
         }
 
-        if self.is_key_pressed(KEY_ROT_LEFT) {
-            self.rotate(elapsed_time * ROTATE_SPEED);
-        }
-        if self.is_key_pressed(KEY_ROT_RIGHT) {
+        if self.is_key_pressed(DO_ROT_LEFT) {
             self.rotate(-elapsed_time * ROTATE_SPEED);
+        }
+        if self.is_key_pressed(DO_ROT_RIGHT) {
+            self.rotate(elapsed_time * ROTATE_SPEED);
         }
 
         true
@@ -216,12 +340,14 @@ impl GraphicsLoop for RayCaster {
 
 
     fn paint(&self, painter: &mut dyn Painter) {
+        // clear the screen ...
         painter.fill_rect(0, 0,
             self.scr_width as i32, self.scr_height as i32,
-            GREY);
-
+            DARK_GREY);
+        // ... and draw everything
         self.draw_mini_map(painter);
         self.draw_3d_view(painter);
+        self.draw_rays(painter);
     }
 
 }
@@ -243,7 +369,9 @@ impl RayCasterBuilder {
                 map: vec![],
                 pos_x: 0.0,
                 pos_y: 0.0,
-                pos_angle: 0.0,
+                pos_angle: 270.0,
+                pdx: 0.0,
+                pdy: 0.0,
                 mini_map_side: 0,
                 view_x: 0,
                 view_y: 0,
@@ -323,9 +451,12 @@ impl RayCasterBuilder {
 
         // the properties of the 3D view
         self.0.view_x = self.0.mini_map_side * (self.0.map_width as i32) + 2;
-        self.0.view_width = ((self.0.scr_width as i32) - self.0.view_x - 1) | 0x0001;
+        self.0.view_width = (self.0.scr_width as i32) - self.0.view_x;
         self.0.view_height = self.0.scr_height as i32;
     
+        // pre-compute rotation data
+        self.0.rotate(0.0);
+
         self.0
     }
 }

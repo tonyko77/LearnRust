@@ -1,6 +1,6 @@
 //! Painter module
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct RGB {
     pub r: u8,
     pub g: u8,

@@ -10,16 +10,16 @@ use raycasting::*;
 const MAP_WIDTH: u32 = 10;
 const MAP_HEIGHT: u32 = 10;
 const MAP: &'static str = concat!(
-    "AAAAAAAAAA",
-    "A........A",
-    "A....AAA.A",
-    "A..AAA.A.A",
-    "A..A...AAA",
-    "A........A",
-    "A.AA.....A",
-    "A.A..@.A.A",
-    "A........A",
-    "AAAAAAAAAA",
+    "CCCCCCCCCC",
+    "C........C",
+    "C....EFE.C",
+    "C..FEF.F.C",
+    "C..E...EFC",
+    "C........C",
+    "C.GB.....A",
+    "C.B..@.D.C",
+    "C........C",
+    "CCCCCCCCCC",
 );
 
 const SCR_WIDTH: u32 = 1024;
