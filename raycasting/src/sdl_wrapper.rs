@@ -9,7 +9,13 @@ use sdl2::pixels::PixelFormatEnum;
 use std::time::{Instant, Duration};
 
 
-const SLEEP_DURATION: Duration = Duration::from_micros(1);
+/// Enum for if/how to slep during each game loop execution.
+#[derive(PartialEq, Eq)]
+pub enum SleepMethod {
+    NONE,
+    YIELD,
+    SLEEP(u32),
+}
 
 
 /// The configuration to be used for initializing SDL.
@@ -18,27 +24,33 @@ pub struct SdlConfiguration {
     width: u32,
     height: u32,
     pixel_size: u32,
-    should_sleep: bool,
+    sleep_method: SleepMethod,
 }
 
 impl SdlConfiguration {
-    pub fn new(title: &str, width: u32, height: u32, pixel_size: u32, should_sleep: bool) -> Self {
+    pub fn new(title: &str, width: u32, height: u32, pixel_size: u32, sleep_method: SleepMethod) -> Self {
         SdlConfiguration {
             title: String::from(title),
             width,
             height,
             pixel_size,
-            should_sleep,
+            sleep_method,
         }
     }
 }
 
 
-/// Must be implemented by whoever wants to use SDL
+/// Trait to be implemented by clients of `run_sdl_loop`.
+/// Its methods will be called periodically, during the main game loop.
 pub trait GraphicsLoop {
-    fn handle_event(&mut self, elapsed_time: f64, event: &Event) -> bool;
+    /// Handle/capture events (e.g. keys, mouse etc).
+    fn handle_event(&mut self, event: &Event) -> bool;
 
-    fn run(&mut self, elapsed_time: f64, painter: &mut dyn Painter) -> bool;
+    /// Update the internal state.
+    fn update_state(&mut self, elapsed_time: f64) -> bool;
+
+    /// Paint the world, based on the updated internal state.
+    fn paint(&self, painter: &mut dyn Painter);
 }
 
 
@@ -74,14 +86,6 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
 
     // Main game loop
     'running: loop {
-        // compute time
-        let elapsed_time = timer.update_and_get_ellapsed_time();
-        if last_fps != timer.fps {
-            last_fps = timer.fps;
-            let title_with_fps = format!("{} - FPS: {}", cfg.title, last_fps);
-            canvas.window_mut().set_title(&title_with_fps).map_err(|e| e.to_string())?;
-        }
-
         // consume the event loop
         for event in event_pump.poll_iter() {
             match event {
@@ -91,18 +95,30 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
                     ..
                 } => break 'running,
                 _ => {
-                    if !gfx_loop.handle_event(elapsed_time, &event) {
+                    if !gfx_loop.handle_event(&event) {
                         break 'running;
                     }
                 }
             }
         }
 
+        // compute time
+        let elapsed_time = timer.update_and_get_ellapsed_time();
+        if last_fps != timer.fps {
+            last_fps = timer.fps;
+            let title_with_fps = format!("{} - FPS: {}", cfg.title, last_fps);
+            canvas.window_mut().set_title(&title_with_fps).map_err(|e| e.to_string())?;
+        }
+
+        // update the internal state
+        if !gfx_loop.update_state(elapsed_time) {
+            break 'running;
+        }
+
         // draw stuff
         // improved this using SDL textures:
         // - see: https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/renderer-texture.rs
         // - see: https://www.reddit.com/r/cpp_questions/comments/eqwsao/sdl_rendering_way_too_slow/
-        let mut ok = true;
         screen_buffer.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             // all painting must be done in this closure
             let mut painter = InternalTexturePainter {
@@ -111,19 +127,22 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
                 scr_width: cfg.width as i32,
                 scr_height: cfg.height as i32,
             };
-            ok = gfx_loop.run(elapsed_time, &mut painter);
+            gfx_loop.paint(&mut painter);
         })?;
-        if !ok {
-            break 'running;
-        }
 
         // paint texture on screen
         canvas.copy(&screen_buffer, None, None)?;
         canvas.present();
 
         // sleep a bit, so we don't hog the CPU
-        if cfg.should_sleep {
-            std::thread::sleep(SLEEP_DURATION);
+        match cfg.sleep_method {
+            SleepMethod::SLEEP(nanos) => {
+                std::thread::sleep(Duration::new(0, nanos));
+            },
+            SleepMethod::YIELD => {
+                std::thread::yield_now();
+            },
+            _ => { }
         }
     }
 

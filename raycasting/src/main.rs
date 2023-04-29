@@ -1,7 +1,11 @@
 //! Simple ray-casting engine demo, using SDL2
 //! Inspired by [this YouTube clip](https://www.youtube.com/watch?v=gYRrGTC7GtA)
 
+// This magic line prevents the opening of a terminal when launching the app
+//#![windows_subsystem = "windows"]
+
 use raycasting::*;
+
 
 const MAP_WIDTH: u32 = 10;
 const MAP_HEIGHT: u32 = 10;
@@ -18,11 +22,11 @@ const MAP: &'static str = concat!(
     "AAAAAAAAAA",
 );
 
-const SCR_WIDTH: u32 = 500;
-const SCR_HEIGHT: u32 = 300;
-const PIXEL_SIZE: u32 = 2;
+const SCR_WIDTH: u32 = 1024;
+const SCR_HEIGHT: u32 = 512;
+const PIXEL_SIZE: u32 = 1;
 
-const SHOULD_SLEEP: bool = true;
+const SHOULD_SLEEP: SleepMethod = SleepMethod::YIELD;
 
 
 fn main() {

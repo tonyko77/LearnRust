@@ -16,10 +16,17 @@ use sdl2::keyboard::*;
 
 // TO BE ADJUSTED
 const MINI_MAP_WIDTH_PERCENT: u32 = 40;
-const WALK_SPEED: f64 = 30.0;
+const WALK_SPEED: f64 = 4.0;
 const STRAFE_SPEED: f64 = WALK_SPEED;
 const ROTATE_SPEED: f64 = 1.0;
 const MIN_DISTANCE_TO_WALL: f64 = 0.2;
+
+const     KEY_WALK_FWD: u32 = 0x01;
+const    KEY_WALK_BACK: u32 = 0x02;
+const  KEY_STRAFE_LEFT: u32 = 0x04;
+const KEY_STRAFE_RIGHT: u32 = 0x08;
+const     KEY_ROT_LEFT: u32 = 0x10;
+const    KEY_ROT_RIGHT: u32 = 0x20;
 
 
 /// `RayCaster` engine. Must be built using [`RayCasterBuilder`].
@@ -37,6 +44,7 @@ pub struct RayCaster {
     view_y: i32,
     view_width: i32,
     view_height: i32,
+    keys: u32,
 }
 
 
@@ -68,65 +76,66 @@ impl RayCaster {
 
         (distance, 0, orientation)
     }
-}
 
 
-impl GraphicsLoop for RayCaster {
-    fn handle_event(&mut self, elapsed_time: f64, event: &Event) -> bool {
-        match event {
-            Event::KeyDown { keycode: Some(Keycode::W), .. } => { 
-                self.walk(elapsed_time * WALK_SPEED);
-            },
-            Event::KeyDown { keycode: Some(Keycode::S), .. } => { 
-                self.walk(-elapsed_time * WALK_SPEED);
-            },
-
-            Event::KeyDown { keycode: Some(Keycode::A), .. } => { 
-                self.strafe(elapsed_time * STRAFE_SPEED);
-            },
-            Event::KeyDown { keycode: Some(Keycode::D), .. } => { 
-                self.strafe(-elapsed_time * STRAFE_SPEED);
-            },
-
-            Event::KeyDown { keycode: Some(Keycode::Q), .. } => { 
-                self.rotate(elapsed_time * ROTATE_SPEED);
-            },
-            Event::KeyDown { keycode: Some(Keycode::E), .. } => { 
-                self.rotate(-elapsed_time * ROTATE_SPEED);
-            },
-
-            Event::KeyDown { keycode: Some(Keycode::X), keymod: modd,  .. } => { 
-                if modd.contains(Mod::LALTMOD) {
-                    return false;
-                }
-            },
-
-            _ => { }
-        }
-        true
+    #[inline]
+    fn is_key_pressed(&self, flag: u32) -> bool {
+        (self.keys & flag) != 0
     }
 
-    fn run(&mut self, _elapsed_time: f64, painter: &mut dyn Painter) -> bool {
-        let width = self.scr_width as i32;
-        let height = self.scr_height as i32;
-        painter.fill_rect(0, 0, width, height, GREY);
+    #[inline]
+    fn handle_key_down(&mut self, key: &Keycode) {
+        match *key {
+            Keycode::W => self.keys |= KEY_WALK_FWD,
+            Keycode::S => self.keys |= KEY_WALK_BACK,
+            Keycode::A => self.keys |= KEY_STRAFE_LEFT,
+            Keycode::D => self.keys |= KEY_STRAFE_RIGHT,
+            Keycode::Q => self.keys |= KEY_ROT_LEFT,
+            Keycode::E => self.keys |= KEY_ROT_RIGHT,
+            _ => { } 
+        }
+    }
 
-        // draw the mini map
+    #[inline]
+    fn handle_key_up(&mut self, key: &Keycode) {
+        match *key {
+            Keycode::W => self.keys &= !KEY_WALK_FWD,
+            Keycode::S => self.keys &= !KEY_WALK_BACK,
+            Keycode::A => self.keys &= !KEY_STRAFE_LEFT,
+            Keycode::D => self.keys &= !KEY_STRAFE_RIGHT,
+            Keycode::Q => self.keys &= !KEY_ROT_LEFT,
+            Keycode::E => self.keys &= !KEY_ROT_RIGHT,
+            _ => { } 
+        }
+    }
+
+
+    fn draw_mini_map(&self, painter: &mut dyn Painter) {
+        // draw mini map
         let ms = self.mini_map_side;
         for x in 0..self.map_width as i32 {
             for y in 0..self.map_height as i32 {
                 painter.draw_rect(x * ms, y * ms, ms + 1, ms + 1, DARK_GREY);
                 let idx = (y * (self.map_width as i32) + x) as usize;
                 let cell = self.map[idx];
-                // TODO use various colors for walls
+                // TODO use various colors for walls ...
                 let color = if cell == 0 { BLACK } else { WHITE };
                 painter.fill_rect(x * ms + 1, y * ms + 1, ms - 1, ms - 1, color);
             }
         }
+
         // draw the player on the mini map
         let px = (self.pos_x * (ms as f64)) as i32;
         let py = (self.pos_y * (ms as f64)) as i32;
-        painter.fill_rect(px - 1, py - 1, 3, 3, LIGHT_YELLOW);
+        painter.fill_circle(px, py, 2, LIGHT_YELLOW);
+
+        // draw the player's direction
+        // TODO ...
+    }
+
+
+    fn draw_3d_view(&self, painter: &mut dyn Painter) {
+        let width = self.scr_width as i32;
 
         // draw the view horizon
         let half_height = self.view_height / 2;
@@ -142,8 +151,77 @@ impl GraphicsLoop for RayCaster {
         }
 
         // cast rays to draw the walls
+        // TODO ...
+    }
+}
+
+
+impl GraphicsLoop for RayCaster {
+    fn handle_event(&mut self, event: &Event) -> bool {
+        // check keys
+        match event {
+            Event::KeyDown { keycode: Some(Keycode::X), keymod: modd,  .. } => { 
+                if modd.contains(Mod::LALTMOD) {
+                    return false;
+                }
+            },
+
+            Event::KeyDown { keycode: Some(key), .. } => {
+                self.handle_key_down(key);
+            },
+
+            Event::KeyUp { keycode: Some(key), .. } => {
+                self.handle_key_up(key);
+            },
+
+            _ => { }
+        }
+
+        // exit on LAlt + X
+        if let Event::KeyDown { keycode: Some(Keycode::X), keymod: modd,  .. } = event { 
+            if modd.contains(Mod::LALTMOD) {
+                return false;
+            }
+        }
 
         true
+    }
+
+
+    fn update_state(&mut self, elapsed_time: f64) -> bool {
+        // handle movement
+        if self.is_key_pressed(KEY_WALK_FWD) {
+            self.walk(elapsed_time * WALK_SPEED);
+        }
+        if self.is_key_pressed(KEY_WALK_BACK) {
+            self.walk(-elapsed_time * WALK_SPEED);
+        }
+
+        if self.is_key_pressed(KEY_STRAFE_LEFT) {
+            self.strafe(elapsed_time * STRAFE_SPEED);
+        }
+        if self.is_key_pressed(KEY_STRAFE_RIGHT) {
+            self.strafe(-elapsed_time * STRAFE_SPEED);
+        }
+
+        if self.is_key_pressed(KEY_ROT_LEFT) {
+            self.rotate(elapsed_time * ROTATE_SPEED);
+        }
+        if self.is_key_pressed(KEY_ROT_RIGHT) {
+            self.rotate(-elapsed_time * ROTATE_SPEED);
+        }
+
+        true
+    }
+
+
+    fn paint(&self, painter: &mut dyn Painter) {
+        painter.fill_rect(0, 0,
+            self.scr_width as i32, self.scr_height as i32,
+            GREY);
+
+        self.draw_mini_map(painter);
+        self.draw_3d_view(painter);
     }
 
 }
@@ -171,6 +249,7 @@ impl RayCasterBuilder {
                 view_y: 0,
                 view_width: 0,
                 view_height: 0,
+                keys: 0,
             }
         }
     }
@@ -249,7 +328,6 @@ impl RayCasterBuilder {
     
         self.0
     }
-
 }
 
 
