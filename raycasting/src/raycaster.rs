@@ -3,25 +3,25 @@
 use crate::*;
 use sdl2::keyboard::*;
 
-
 // constants for converting degrees to radians
-const FULL_CIRCLE: f64 = std::f64::consts::PI / 180.0; 
+const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 
 // TO BE ADJUSTED
 const MINI_MAP_WIDTH_PERCENT: u32 = 40;
 const WALK_SPEED: f64 = 4.0;
 const STRAFE_SPEED: f64 = WALK_SPEED;
-const ROTATE_SPEED: f64 = 150.0;
+const ROTATE_SPEED: f64 = 100.0;
 const MIN_DISTANCE_TO_WALL: f64 = 0.1;
 const MINIMAP_DIRECTION_LEN: f64 = 10.0;
 //const HALF_HORIZ_FOV: f64 = 45.0;
+const EPSILON: f64 = 0.001;
 
-const     DO_WALK_FWD: u32 = 0x0001;
-const    DO_WALK_BACK: u32 = 0x0002;
-const  DO_STRAFE_LEFT: u32 = 0x0004;
+const DO_WALK_FWD: u32 = 0x0001;
+const DO_WALK_BACK: u32 = 0x0002;
+const DO_STRAFE_LEFT: u32 = 0x0004;
 const DO_STRAFE_RIGHT: u32 = 0x0008;
-const     DO_ROT_LEFT: u32 = 0x0010;
-const    DO_ROT_RIGHT: u32 = 0x0020;
+const DO_ROT_LEFT: u32 = 0x0010;
+const DO_ROT_RIGHT: u32 = 0x0020;
 //const          DO_RUN: u32 = 0x0040;
 //const          DO_USE: u32 = 0x0080;
 //const        DO_SHOOT: u32 = 0x0100;
@@ -29,17 +29,8 @@ const    DO_ROT_RIGHT: u32 = 0x0020;
 const MAP_EMPTY: u8 = 0;
 const MAP_EDGE: u8 = u8::MAX;
 
-const WALL_COLORS: &[RGB] = &[
-    MAGENTA,
-    BROWN,
-    CYAN,
-    RED,
-    GREEN,
-    YELLOW,
-    BLUE,
-];
+const WALL_COLORS: &[RGB] = &[MAGENTA, BROWN, CYAN, RED, GREEN, YELLOW, BLUE];
 const WALL_SHADINGS: &[u32] = &[100, 80, 50, 70];
-
 
 /// `RayCaster` engine. Must be built using [`RayCasterBuilder`].
 pub struct RayCaster {
@@ -61,7 +52,6 @@ pub struct RayCaster {
     keys: u32,
 }
 
-
 impl RayCaster {
     pub fn walk(&mut self, distance: f64) {
         self.move_and_keep_away_from_obstacles(distance, self.pdx, self.pdy);
@@ -74,10 +64,9 @@ impl RayCaster {
 
     pub fn rotate(&mut self, rotation_degrees: f64) {
         self.pos_angle = add_angles_in_degrees(self.pos_angle, rotation_degrees);
-        self.pdx = (self.pos_angle * FULL_CIRCLE).cos();
-        self.pdy = (self.pos_angle * FULL_CIRCLE).sin();
+        self.pdx = (self.pos_angle * DEG_TO_RAD).cos();
+        self.pdy = (self.pos_angle * DEG_TO_RAD).sin();
     }
-
 
     fn move_and_keep_away_from_obstacles(&mut self, distance: f64, pdx: f64, pdy: f64) {
         let w = self.map_width as i32;
@@ -94,9 +83,10 @@ impl RayCaster {
         let coll_x = (xx < 0) || (xx >= w) || {
             let yl = (self.pos_y - MIN_DISTANCE_TO_WALL) as i32;
             let yh = (self.pos_y + MIN_DISTANCE_TO_WALL) as i32;
-            yl < 0 || yh >= h ||
-            self.map[(yl * w + xx) as usize] != MAP_EMPTY ||
-            self.map[(yh * w + xx) as usize] != MAP_EMPTY
+            yl < 0
+                || yh >= h
+                || self.map[(yl * w + xx) as usize] != MAP_EMPTY
+                || self.map[(yh * w + xx) as usize] != MAP_EMPTY
         };
         if coll_x {
             // collision on X => restore X coordinate
@@ -114,16 +104,16 @@ impl RayCaster {
         let coll_y = (yy < 0) || (yy >= h) || {
             let xl = (self.pos_x - MIN_DISTANCE_TO_WALL) as i32;
             let xh = (self.pos_x + MIN_DISTANCE_TO_WALL) as i32;
-            xl < 0 || xh >= w ||
-            self.map[(yy * w + xl) as usize] != MAP_EMPTY ||
-            self.map[(yy * w + xh) as usize] != MAP_EMPTY
+            xl < 0
+                || xh >= w
+                || self.map[(yy * w + xl) as usize] != MAP_EMPTY
+                || self.map[(yy * w + xh) as usize] != MAP_EMPTY
         };
         if coll_y {
             // collision on Y => restore Y coordinate
             self.pos_y -= move_y;
         }
     }
-
 
     fn draw_mini_map(&self, painter: &mut dyn Painter) {
         let ms = self.mini_map_side;
@@ -144,12 +134,18 @@ impl RayCaster {
         for y in 0..=half_height {
             let shade_up = (y * 100 / half_height) as u8;
             let shade_down = 50 + (shade_up / 2);
-            painter.draw_horiz_line(self.view_x, width-1,
+            painter.draw_horiz_line(
+                self.view_x,
+                width - 1,
                 y + self.view_y,
-                RGB::from(shade_up, 128, 128));
-            painter.draw_horiz_line(self.view_x, width-1,
+                RGB::from(shade_up, 128, 128),
+            );
+            painter.draw_horiz_line(
+                self.view_x,
+                width - 1,
                 self.view_height - y + self.view_y,
-                RGB::from(shade_down, shade_down, shade_down));
+                RGB::from(shade_down, shade_down, shade_down),
+            );
         }
     }
 
@@ -160,21 +156,19 @@ impl RayCaster {
         let py = (self.pos_y * (ms as f64)) as i32;
 
         // cast rays to draw the walls
-        //self.cast_and_draw_ray(0.0, self.view_x + self.view_width / 2);
-        // TODO only one ray for now 
+        // TODO only one ray for now
         let delta_angle = 0.0;
         let angle = add_angles_in_degrees(self.pos_angle, delta_angle);
         let (dist, wall, orientation) = self.compute_ray(angle);
         let color = Self::get_wall_color(wall, orientation);
 
         // draw the ray on the mini map
-        let ray_x = ((angle * FULL_CIRCLE).cos() * dist * (ms as f64)) as i32;
-        let ray_y = ((angle * FULL_CIRCLE).sin() * dist * (ms as f64)) as i32;
+        let ray_x = ((angle * DEG_TO_RAD).cos() * dist * (ms as f64)) as i32;
+        let ray_y = ((angle * DEG_TO_RAD).sin() * dist * (ms as f64)) as i32;
         painter.draw_line(px, py, px + ray_x, py + ray_y, color);
 
         // draw the result of the ray cast on the 3D view
         // TODO ...
-
 
         // after the rays, draw the player on the mini map
         // (so it appears over the rays)
@@ -187,80 +181,72 @@ impl RayCaster {
 
     /// Computes: distance to wall, wall color index, wall orientation(0=N, 1=W, 2=S, 3=E)
     fn compute_ray(&self, angle: f64) -> (f64, u8, u8) {
-        if angle > 359.9 || angle < 0.1 {
-            // looking east
-            self.compute_orthogonal_ray(1, 0, 3)
-        }
-        else if angle > 89.9 && angle < 90.1 {
-            // looking south (IMPORTANT: Y axis is pointing DOWN)
-            self.compute_orthogonal_ray(0, 1, 2)
-        }
-        else if angle > 179.9 && angle < 180.1 {
-            // looking west
-            self.compute_orthogonal_ray(-1, 0, 1)
-        }
-        else if angle > 269.9 && angle < 270.1 {
-            // looking north (IMPORTANT: Y axis is pointing DOWN)
-            self.compute_orthogonal_ray(0, -1, 0)
-        }
-        else {
-            // looking at an angle => safe to use tan()
-            let atan = -1.0 / angle.tan();
+        let sin = (angle * DEG_TO_RAD).sin();
+        let cos = (angle * DEG_TO_RAD).cos();
+        let map_w = self.map_width as i32;
+        let map_h = self.map_height as i32;
+        let mut map_x = self.pos_x as i32;
+        let mut map_y = self.pos_y as i32;
+        let mut map_idx = map_y * map_w + map_x;
 
-            // compute directions
-            let (dx, dy) = 
-                if angle < 90.0 { (1, 1) }
-                else if angle < 180.0 { (-1, 1) }
-                else if angle < 180.0 { (-1, -1) }
-                else { (1, -1) };
+        let (mut dist_x, scale_x, dir_x, orient_x) = if cos > EPSILON {
+            // looking RIGHT
+            let d = self.pos_x.floor() + 1.0 - self.pos_x;
+            (d / cos, 1.0 / cos, 1, 3_u8)
+        } else if cos < -EPSILON {
+            // looking LEFT
+            let d = self.pos_x.floor() - self.pos_x;
+            (d / cos, -1.0 / cos, -1, 1_u8)
+        } else {
+            // straight vertical => no hits on the X axis
+            (f64::MAX, 0.0, 0, 0_u8)
+        };
 
-            // !! TODO implement this !!
-            (0.0, 0, 0)
+        let (mut dist_y, scale_y, dir_y, orient_y) = if sin > EPSILON {
+            // looking DOWN
+            let d = self.pos_y.floor() + 1.0 - self.pos_y;
+            (d / sin, 1.0 / sin, 1, 2_u8)
+        } else if sin < -EPSILON {
+            // looking UP
+            let d = self.pos_y.floor() - self.pos_y;
+            (d / sin, -1.0 / sin, -1, 0_u8)
+        } else {
+            // straight horizontal => no hits on the Y axis
+            (f64::MAX, 0.0, 0, 0_u8)
+        };
+
+        loop {
+            if dist_x < dist_y {
+                // moving on the X axis
+                map_x += dir_x;
+                map_idx += dir_x;
+                let m = if map_x < 0 || map_x >= map_w {
+                    MAP_EDGE
+                } else {
+                    self.map[map_idx as usize]
+                };
+                if m != MAP_EMPTY {
+                    return (dist_x, m, orient_x);
+                }
+                // continue on the X axis
+                dist_x += scale_x;
+            } else {
+                // moving on the Y axis
+                map_y += dir_y;
+                map_idx += dir_y * map_w;
+                let m = if map_y < 0 || map_y >= map_h {
+                    MAP_EDGE
+                } else {
+                    self.map[map_idx as usize]
+                };
+                if m != MAP_EMPTY {
+                    return (dist_y, m, orient_y);
+                }
+                // continue on the Y axis
+                dist_y += scale_y;
+            }
         }
     }
-
-    fn compute_orthogonal_ray(&self, dx: i32, dy: i32, orientation: u8) -> (f64, u8, u8) {
-        let mut x = (self.pos_x) as i32;
-        let mut y = (self.pos_y) as i32;
-
-        let mut dist: f64 =
-            if dy == 0 {
-                if dx < 0 {
-                    self.pos_x - (x as f64)
-                }
-                else {
-                    ((x + 1) as f64) - self.pos_x
-                }
-            }
-            else {
-                if dy < 0 {
-                    self.pos_y - (y as f64)
-                }
-                else {
-                    ((y + 1) as f64) - self.pos_y
-                }
-            };
-
-        let mut wall: u8 = 0;
-        let w = self.map_width as i32;
-        let h = self.map_height as i32;
-        x += dx;
-        y += dy;
-
-        while x >= 0 && x < w && y >= 0 && y < h {
-            let idx = (y * w + x) as usize;
-            wall = self.map[idx];
-            if wall > 0 {
-                break;
-            }
-            dist += 1.0;
-            x += dx;
-            y += dy;
-        }
-
-        (dist, wall, orientation)
-    }
-
 
     #[inline]
     fn is_key_pressed(&self, flag: u32) -> bool {
@@ -276,7 +262,7 @@ impl RayCaster {
             Keycode::D => self.keys |= DO_STRAFE_RIGHT,
             Keycode::Q => self.keys |= DO_ROT_LEFT,
             Keycode::E => self.keys |= DO_ROT_RIGHT,
-            _ => { } 
+            _ => {}
         }
     }
 
@@ -289,7 +275,7 @@ impl RayCaster {
             Keycode::D => self.keys &= !DO_STRAFE_RIGHT,
             Keycode::Q => self.keys &= !DO_ROT_LEFT,
             Keycode::E => self.keys &= !DO_ROT_RIGHT,
-            _ => { } 
+            _ => {}
         }
     }
 
@@ -297,48 +283,54 @@ impl RayCaster {
     fn get_wall_color(wall: u8, orientation: u8) -> RGB {
         if wall == MAP_EMPTY || wall == MAP_EDGE {
             BLACK
-        }
-        else {
+        } else {
             let color = WALL_COLORS[(wall as usize) % WALL_COLORS.len()];
             let shading = WALL_SHADINGS[(orientation as usize) % WALL_SHADINGS.len()];
             RGB {
-                r: Self::shade_wall_color(color.r, shading),
-                g: Self::shade_wall_color(color.g, shading),
-                b: Self::shade_wall_color(color.b, shading),
+                r: ((color.r as u32) * shading / 100) as u8,
+                g: ((color.g as u32) * shading / 100) as u8,
+                b: ((color.b as u32) * shading / 100) as u8,
             }
         }
     }
-
-    #[inline]
-    fn shade_wall_color(rgb: u8, shading: u32) -> u8 {
-        ((rgb as u32) * shading / 100) as u8
-    }
 }
-
 
 impl GraphicsLoop for RayCaster {
     fn handle_event(&mut self, event: &Event) -> bool {
         // check keys
         match event {
-            Event::KeyDown { keycode: Some(Keycode::X), keymod: modd,  .. } => { 
+            Event::KeyDown {
+                keycode: Some(Keycode::X),
+                keymod: modd,
+                ..
+            } => {
                 if modd.contains(Mod::LALTMOD) {
                     return false;
                 }
-            },
+            }
 
-            Event::KeyDown { keycode: Some(key), .. } => {
+            Event::KeyDown {
+                keycode: Some(key), ..
+            } => {
                 self.handle_key_down(key);
-            },
+            }
 
-            Event::KeyUp { keycode: Some(key), .. } => {
+            Event::KeyUp {
+                keycode: Some(key), ..
+            } => {
                 self.handle_key_up(key);
-            },
+            }
 
-            _ => { }
+            _ => {}
         }
 
         // exit on LAlt + X
-        if let Event::KeyDown { keycode: Some(Keycode::X), keymod: modd,  .. } = event { 
+        if let Event::KeyDown {
+            keycode: Some(Keycode::X),
+            keymod: modd,
+            ..
+        } = event
+        {
             if modd.contains(Mod::LALTMOD) {
                 return false;
             }
@@ -346,7 +338,6 @@ impl GraphicsLoop for RayCaster {
 
         true
     }
-
 
     fn update_state(&mut self, elapsed_time: f64) -> bool {
         // handle movement
@@ -374,20 +365,21 @@ impl GraphicsLoop for RayCaster {
         true
     }
 
-
     fn paint(&self, painter: &mut dyn Painter) {
         // clear the screen ...
-        painter.fill_rect(0, 0,
-            self.scr_width as i32, self.scr_height as i32,
-            DARK_GREY);
+        painter.fill_rect(
+            0,
+            0,
+            self.scr_width as i32,
+            self.scr_height as i32,
+            DARK_GREY,
+        );
         // ... and draw everything
         self.draw_mini_map(painter);
         self.draw_3d_view(painter);
         self.draw_rays(painter);
     }
-
 }
-
 
 //-------------------------------------------------------
 
@@ -414,7 +406,7 @@ impl RayCasterBuilder {
                 view_width: 0,
                 view_height: 0,
                 keys: 0,
-            }
+            },
         }
     }
 
@@ -448,21 +440,24 @@ impl RayCasterBuilder {
         let mut idx = 0_usize;
         for ch in map_data.chars() {
             match ch {
-                'A'..='Z' => { // wall
+                'A'..='Z' => {
+                    // wall
                     self.0.map[idx] = 1 + (ch as u8) - ('A' as u8);
                     idx += 1;
-                },
-                '.' => { // empty space
+                }
+                '.' => {
+                    // empty space
                     self.0.map[idx] = MAP_EMPTY;
                     idx += 1;
-                },
-                '@' => { // player position
+                }
+                '@' => {
+                    // player position
                     let y = (idx as u32) / self.0.map_width;
                     let x = (idx as u32) - y * self.0.map_width;
                     self.0.pos_x = (x as f64) + 0.5;
                     self.0.pos_y = (y as f64) + 0.5;
                     idx += 1;
-                },
+                }
                 _ => {} // just skip all other characters
             }
             if idx >= map_len {
@@ -489,14 +484,13 @@ impl RayCasterBuilder {
         self.0.view_x = self.0.mini_map_side * (self.0.map_width as i32) + 2;
         self.0.view_width = (self.0.scr_width as i32) - self.0.view_x;
         self.0.view_height = self.0.scr_height as i32;
-    
+
         // pre-compute rotation data
         self.0.rotate(0.0);
 
         self.0
     }
 }
-
 
 //---------------------------------------
 //  Internal stuff
@@ -506,11 +500,9 @@ fn add_angles_in_degrees(a1: f64, a2: f64) -> f64 {
     let new_angle = a1 + a2;
     if new_angle < 0.0 {
         new_angle + 360.0
-    }
-    else if new_angle >= 360.0 {
+    } else if new_angle >= 360.0 {
         new_angle - 360.0
-    }
-    else {
+    } else {
         new_angle
     }
 }
