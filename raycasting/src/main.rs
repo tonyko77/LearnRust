@@ -6,9 +6,7 @@
 
 use raycasting::*;
 
-const MAP_WIDTH: u32 = 11;
-const MAP_HEIGHT: u32 = 11;
-const MAP: &'static str = concat!(
+const MAP: &[&str] = &[
     "CACACACACAC",
     "A.........A",
     "C....FEF..C",
@@ -20,32 +18,30 @@ const MAP: &'static str = concat!(
     "C..B...D..C",
     "A.........A",
     "CACACACACAC",
-);
+];
 
-const SCR_WIDTH: u32 = 1200;
-const SCR_HEIGHT: u32 = 600;
-const PIXEL_SIZE: u32 = 1;
+const SCR_WIDTH: i32 = 1200;
+const SCR_HEIGHT: i32 = 600;
+const PIXEL_SIZE: i32 = 1;
 
-const SHOULD_SLEEP: SleepMethod = SleepMethod::YIELD;
+const SLEEP_KIND: SleepKind = SleepKind::YIELD;
 
 fn main() {
+    // prepare the map data
+    let map_width = MAP[0].len() as i32;
+    let map_height = MAP.len() as i32;
+    let flatmap = MAP.concat();
+
+    // build the ray caster "demo"
     let mut builder = RayCasterBuilder::new();
     builder
         .scr_size(SCR_WIDTH, SCR_HEIGHT)
-        .map_size(MAP_WIDTH, MAP_HEIGHT)
-        .map_from_str(MAP);
-
+        .map_size(map_width, map_height)
+        .map_from_str(&flatmap);
     let mut raycaster = builder.build();
 
-    let sdl_config = SdlConfiguration::new(
-        "Ray Caster Demo",
-        SCR_WIDTH,
-        SCR_HEIGHT,
-        PIXEL_SIZE,
-        SHOULD_SLEEP,
-    );
-
     // main game loop
+    let sdl_config = SdlConfiguration::new("Ray Caster Demo", SCR_WIDTH, SCR_HEIGHT, PIXEL_SIZE, SLEEP_KIND);
     let res = raycasting::run_sdl_loop(&sdl_config, &mut raycaster);
     if let Err(msg) = res {
         println!("ERROR: {msg}");

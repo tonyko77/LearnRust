@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 /// Enum for if/how to slep during each game loop execution.
 #[derive(PartialEq, Eq)]
-pub enum SleepMethod {
+pub enum SleepKind {
     NONE,
     YIELD,
     SLEEP(u32),
@@ -19,26 +19,23 @@ pub enum SleepMethod {
 /// The configuration to be used for initializing SDL.
 pub struct SdlConfiguration {
     title: String,
-    width: u32,
-    height: u32,
-    pixel_size: u32,
-    sleep_method: SleepMethod,
+    scr_width: i32,
+    scr_height: i32,
+    pixel_size: i32,
+    sleep_kind: SleepKind,
 }
 
 impl SdlConfiguration {
-    pub fn new(
-        title: &str,
-        width: u32,
-        height: u32,
-        pixel_size: u32,
-        sleep_method: SleepMethod,
-    ) -> Self {
+    pub fn new(title: &str, scr_width: i32, scr_height: i32, pixel_size: i32, sleep_kind: SleepKind) -> Self {
+        assert!(scr_width > 0);
+        assert!(scr_height > 0);
+        assert!(pixel_size > 0);
         SdlConfiguration {
             title: String::from(title),
-            width,
-            height,
+            scr_width,
+            scr_height,
             pixel_size,
-            sleep_method,
+            sleep_kind,
         }
     }
 }
@@ -58,13 +55,16 @@ pub trait GraphicsLoop {
 
 /// Main function to run the continuous SDL loop
 pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> Result<(), String> {
-    assert!(cfg.width > 0);
-    assert!(cfg.height > 0);
+    assert!(cfg.scr_width > 0);
+    assert!(cfg.scr_height > 0);
     assert!(cfg.pixel_size > 0);
 
+    let win_width = (cfg.scr_width * cfg.pixel_size) as u32;
+    let win_height = (cfg.scr_height * cfg.pixel_size) as u32;
+    let scr_width = cfg.scr_width as u32;
+    let scr_height = cfg.scr_height as u32;
+
     // create window
-    let win_width = cfg.width * cfg.pixel_size;
-    let win_height = cfg.height * cfg.pixel_size;
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let window = video_subsystem
@@ -78,7 +78,7 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
     // create texture, to paint on
     let texture_creator = canvas.texture_creator();
     let mut screen_buffer = texture_creator
-        .create_texture_streaming(PixelFormatEnum::RGB24, cfg.width, cfg.height)
+        .create_texture_streaming(PixelFormatEnum::RGB24, scr_width, scr_height)
         .map_err(|e| e.to_string())?;
 
     let mut timer = FpsAndElapsedCounter::new();
@@ -119,8 +119,7 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
             break 'running;
         }
 
-        // draw stuff
-        // improved this using SDL textures:
+        // paint the screen, using a SDL2 streaming texture
         // - see: https://github.com/Rust-SDL2/rust-sdl2/blob/master/examples/renderer-texture.rs
         // - see: https://www.reddit.com/r/cpp_questions/comments/eqwsao/sdl_rendering_way_too_slow/
         screen_buffer.with_lock(None, |buffer: &mut [u8], pitch: usize| {
@@ -128,8 +127,8 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
             let mut painter = InternalTexturePainter {
                 buffer,
                 pitch,
-                scr_width: cfg.width as i32,
-                scr_height: cfg.height as i32,
+                scr_width: cfg.scr_width,
+                scr_height: cfg.scr_height,
             };
             gfx_loop.paint(&mut painter);
         })?;
@@ -139,11 +138,11 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         canvas.present();
 
         // sleep a bit, so we don't hog the CPU
-        match cfg.sleep_method {
-            SleepMethod::SLEEP(nanos) => {
+        match cfg.sleep_kind {
+            SleepKind::SLEEP(nanos) => {
                 std::thread::sleep(Duration::new(0, nanos));
             }
-            SleepMethod::YIELD => {
+            SleepKind::YIELD => {
                 std::thread::yield_now();
             }
             _ => {}
@@ -202,11 +201,7 @@ impl FpsAndElapsedCounter {
         self.time_cnt += 1;
         if self.time_sum >= 1.0 {
             let avg = self.time_sum / (self.time_cnt as f64);
-            self.fps = if avg <= 0.0 {
-                999999
-            } else {
-                (1.0 / avg) as u32
-            };
+            self.fps = if avg <= 0.0 { 999999 } else { (1.0 / avg) as u32 };
             self.time_cnt = 0;
             self.time_sum = 0.0;
         }

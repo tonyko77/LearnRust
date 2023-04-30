@@ -1,0 +1,2 @@
+# Formatter settings for rustfmt - see https://rust-lang.github.io/rustfmt
+max_width = 120
