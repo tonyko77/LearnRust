@@ -6,23 +6,24 @@
 
 use raycasting::*;
 
-const MAP_WIDTH: u32 = 10;
-const MAP_HEIGHT: u32 = 10;
+const MAP_WIDTH: u32 = 11;
+const MAP_HEIGHT: u32 = 11;
 const MAP: &'static str = concat!(
-    "CCCCCCCCCC",
-    "C........C",
-    "C....FEF.C",
-    "C..FEF.F.C",
-    "C..E...EFC",
-    "C........C",
-    "C.GB.....A",
-    "C.B..@.D.C",
-    "C........C",
-    "CCCCCCCCCC",
+    "CACACACACAC",
+    "A.........A",
+    "C....FEF..C",
+    "A..FEF.F..A",
+    "C..F...EE.C",
+    "A....@..F.A",
+    "C.........C",
+    "A..GB.....A",
+    "C..B...D..C",
+    "A.........A",
+    "CACACACACAC",
 );
 
-const SCR_WIDTH: u32 = 1024;
-const SCR_HEIGHT: u32 = 512;
+const SCR_WIDTH: u32 = 1200;
+const SCR_HEIGHT: u32 = 600;
 const PIXEL_SIZE: u32 = 1;
 
 const SHOULD_SLEEP: SleepMethod = SleepMethod::YIELD;

@@ -14,15 +14,12 @@ impl RGB {
     }
 }
 
-
 /// Painter interface, to be passed to client code so it can perform painting.
 /// *This is not meant to be implemented by client code.*
 pub trait Painter {
-
     /// Draw a single pixel.
     /// This is the only abstract method. The others are based on this one.
     fn draw_pixel(&mut self, x: i32, y: i32, color: RGB);
-
 
     fn draw_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: RGB) {
         if w > 0 && h > 0 {
@@ -32,24 +29,22 @@ pub trait Painter {
                 self.draw_pixel(xx, y, color);
                 self.draw_pixel(xx, y2, color);
             }
-            for yy in (y+1)..y2 {
+            for yy in (y + 1)..y2 {
                 self.draw_pixel(x, yy, color);
                 self.draw_pixel(x2, yy, color);
             }
         }
     }
 
-
     fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: RGB) {
         if w > 0 && h > 0 {
-            for yy in y .. (y+h) {
-                for xx in x .. (x+w) {
+            for yy in y..(y + h) {
+                for xx in x..(x + w) {
                     self.draw_pixel(xx, yy, color);
                 }
             }
         }
     }
-
 
     // (very basic, using floats, can be improved)
     fn draw_line(&mut self, x1: i32, y1: i32, x2: i32, y2: i32, color: RGB) {
@@ -78,40 +73,35 @@ pub trait Painter {
         }
     }
 
-
     fn draw_horiz_line(&mut self, x1: i32, x2: i32, y: i32, color: RGB) {
         if x1 == x2 {
             self.draw_pixel(x1, y, color);
             return;
         }
-        let (xmin, xmax) = if x1 < x2 { (x1, x2) } else { (x2, x1) } ;
-        for x in xmin ..= xmax {
+        let (xmin, xmax) = if x1 < x2 { (x1, x2) } else { (x2, x1) };
+        for x in xmin..=xmax {
             self.draw_pixel(x, y, color);
         }
     }
-
 
     fn draw_vert_line(&mut self, x: i32, y1: i32, y2: i32, color: RGB) {
         if y1 == y2 {
             self.draw_pixel(x, y1, color);
             return;
         }
-        let (ymin, ymax) = if y1 < y2 { (y1, y2) } else { (y2, y1) } ;
-        for y in ymin ..= ymax {
+        let (ymin, ymax) = if y1 < y2 { (y1, y2) } else { (y2, y1) };
+        for y in ymin..=ymax {
             self.draw_pixel(x, y, color);
         }
     }
-
 
     fn draw_circle(&mut self, x: i32, y: i32, r: i32, color: RGB) {
         self.draw_ellipse(x, y, r, r, color);
     }
 
-
     fn fill_circle(&mut self, x: i32, y: i32, r: i32, color: RGB) {
         self.fill_ellipse(x, y, r, r, color);
     }
-
 
     // (very basic, using floats, can be improved)
     fn draw_ellipse(&mut self, x: i32, y: i32, rx: i32, ry: i32, color: RGB) {
@@ -120,7 +110,7 @@ pub trait Painter {
         let mut sub = 1;
         let imax = ((r as f64) / 1.4142135 + 0.5) as i32;
 
-        for qx in 0 ..= imax {
+        for qx in 0..=imax {
             let qy = ((r2 as f64).sqrt() + 0.5) as i32;
             r2 -= sub;
             sub += 2;
@@ -142,7 +132,6 @@ pub trait Painter {
         }
     }
 
-
     // (very basic, using floats, can be improved)
     fn fill_ellipse(&mut self, x: i32, y: i32, rx: i32, ry: i32, color: RGB) {
         let r = if rx > ry { rx } else { ry };
@@ -150,7 +139,7 @@ pub trait Painter {
         let mut sub = 1;
         let imax = ((r as f64) / 1.4142135 + 0.5) as i32;
 
-        for qx in 0 ..= imax {
+        for qx in 0..=imax {
             let qy = ((r2 as f64).sqrt() + 0.5) as i32;
             r2 -= sub;
             sub += 2;
@@ -166,5 +155,4 @@ pub trait Painter {
             self.draw_horiz_line(x - px2, x + px2, y - py2, color);
         }
     }
-
 }

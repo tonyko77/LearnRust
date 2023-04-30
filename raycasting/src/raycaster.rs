@@ -3,20 +3,20 @@
 use crate::*;
 use sdl2::keyboard::*;
 
-// constants for converting degrees to radians
+// constant for converting degrees to radians
 const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 
-// TO BE ADJUSTED
-const MINI_MAP_WIDTH_PERCENT: u32 = 40;
-const WALK_SPEED: f64 = 4.0;
+// adjustments for engine
+const WALK_SPEED: f64 = 2.5;
 const STRAFE_SPEED: f64 = WALK_SPEED;
-const ROTATE_SPEED: f64 = 120.0;
-const MIN_DISTANCE_TO_WALL: f64 = 0.1;
-const MINIMAP_DIRECTION_LEN: f64 = 10.0;
-const HALF_HORIZ_FOV: f64 = 45.0;
+const ROTATE_SPEED: f64 = 60.0;
+const MIN_DISTANCE_TO_WALL: f64 = 0.2;
+const HALF_HORIZ_FOV: f64 = 20.0;
+const WALL_HEIGHT_SCALER: f64 = 1.0;
+const MINI_MAP_WIDTH_PERCENT: u32 = 30;
 const EPSILON: f64 = 0.001;
-const WALL_HEIGHT_SCALER: f64 = 0.5;
 
+// bit flags for keys
 const DO_WALK_FWD: u32 = 0x0001;
 const DO_WALK_BACK: u32 = 0x0002;
 const DO_STRAFE_LEFT: u32 = 0x0004;
@@ -29,7 +29,6 @@ const DO_ROT_RIGHT: u32 = 0x0020;
 
 const MAP_EMPTY: u8 = 0;
 const MAP_EDGE: u8 = u8::MAX;
-
 const WALL_COLORS: &[RGB] = &[MAGENTA, BROWN, CYAN, RED, GREEN, YELLOW, BLUE];
 const WALL_SHADINGS: &[u32] = &[100, 80, 60, 80];
 
@@ -157,28 +156,31 @@ impl RayCaster {
         let ms = self.mini_map_side;
         let px = (self.pos_x * (ms as f64)) as i32;
         let py = (self.pos_y * (ms as f64)) as i32;
+        // Half FOV, corrected for screen aspect ratio
+        let chhf = HALF_HORIZ_FOV * (self.view_width as f64) / (self.view_height as f64);
 
         // cast rays to draw the walls
-        let mut fov_angle = add_angles_in_degrees(self.pos_angle, -HALF_HORIZ_FOV);
-        let fov_step = 2.0 * HALF_HORIZ_FOV / (self.view_width as f64);
+        let mut fov_angle = add_angles_in_degrees(self.pos_angle, -chhf);
+        let fov_step = 2.0 * chhf / (self.view_width as f64);
         for x in 0..self.view_width {
             let (dist, wall, orientation) = self.compute_ray(fov_angle);
             let color = Self::get_wall_color(wall, orientation);
             // draw SOME of the rays on the mini map
-            if (x & 0x0F) == 0 {
+            if (x & 0x07) == 0 {
                 let ray_x = ((fov_angle * DEG_TO_RAD).cos() * dist * (ms as f64)) as i32;
                 let ray_y = ((fov_angle * DEG_TO_RAD).sin() * dist * (ms as f64)) as i32;
-                painter.draw_line(px, py, px + ray_x, py + ray_y, color);
+                painter.draw_line(px, py, px + ray_x, py + ray_y, GREEN);
             }
             // draw the result of the ray cast on the 3D view
-            let s = WALL_HEIGHT_SCALER / dist;
+            let fish_eye_rectified_dist = dist * ((self.pos_angle - fov_angle) * DEG_TO_RAD).cos();
+            let s = WALL_HEIGHT_SCALER / fish_eye_rectified_dist;
             if s > 0.01 {
                 let h = if s >= 1.0 {
                     self.view_height
                 } else {
                     (s * (self.view_height as f64)) as i32
                 };
-                let y = (self.view_height - h) / 2;
+                let y = (self.view_height - h) >> 1;
                 painter.draw_vert_line(x + self.view_x, y, y + h, color);
             }
             // move to next ray
@@ -189,9 +191,9 @@ impl RayCaster {
         // (so it appears over the rays)
         painter.fill_circle(px, py, 2, LIGHT_YELLOW);
         // draw the player's direction
-        let dirx = (self.pdx * MINIMAP_DIRECTION_LEN) as i32;
-        let diry = (self.pdy * MINIMAP_DIRECTION_LEN) as i32;
-        painter.draw_line(px, py, px + dirx, py + diry, ORANGE);
+        let dirx = (self.pdx * (self.mini_map_side as f64) * 0.3) as i32;
+        let diry = (self.pdy * (self.mini_map_side as f64) * 0.3) as i32;
+        painter.draw_line(px, py, px + dirx, py + diry, LIGHT_YELLOW);
     }
 
     /// Computes: distance to wall, wall color index, wall orientation(0=N, 1=W, 2=S, 3=E).
@@ -274,10 +276,10 @@ impl RayCaster {
         match *key {
             Keycode::W => self.keys |= DO_WALK_FWD,
             Keycode::S => self.keys |= DO_WALK_BACK,
-            Keycode::A => self.keys |= DO_STRAFE_LEFT,
-            Keycode::D => self.keys |= DO_STRAFE_RIGHT,
-            Keycode::Q => self.keys |= DO_ROT_LEFT,
-            Keycode::E => self.keys |= DO_ROT_RIGHT,
+            Keycode::A => self.keys |= DO_ROT_LEFT,
+            Keycode::D => self.keys |= DO_ROT_RIGHT,
+            Keycode::Q => self.keys |= DO_STRAFE_LEFT,
+            Keycode::E => self.keys |= DO_STRAFE_RIGHT,
             _ => {}
         }
     }
@@ -287,10 +289,10 @@ impl RayCaster {
         match *key {
             Keycode::W => self.keys &= !DO_WALK_FWD,
             Keycode::S => self.keys &= !DO_WALK_BACK,
-            Keycode::A => self.keys &= !DO_STRAFE_LEFT,
-            Keycode::D => self.keys &= !DO_STRAFE_RIGHT,
-            Keycode::Q => self.keys &= !DO_ROT_LEFT,
-            Keycode::E => self.keys &= !DO_ROT_RIGHT,
+            Keycode::A => self.keys &= !DO_ROT_LEFT,
+            Keycode::D => self.keys &= !DO_ROT_RIGHT,
+            Keycode::Q => self.keys &= !DO_STRAFE_LEFT,
+            Keycode::E => self.keys &= !DO_STRAFE_RIGHT,
             _ => {}
         }
     }
@@ -510,7 +512,7 @@ impl RayCasterBuilder {
     }
 }
 
-//---------------------------------------
+//-------------------------------------------------------
 //  Internal stuff
 
 #[inline]
