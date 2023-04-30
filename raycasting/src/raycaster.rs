@@ -10,8 +10,8 @@ const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 const WALK_SPEED: f64 = 2.5;
 const STRAFE_SPEED: f64 = WALK_SPEED;
 const ROTATE_SPEED: f64 = 60.0;
-const MIN_DISTANCE_TO_WALL: f64 = 0.2;
-const HALF_HORIZ_FOV: f64 = 22.0;
+const MIN_DISTANCE_TO_WALL: f64 = 0.25;
+const HALF_HORIZ_FOV: f64 = 23.0;
 const WALL_HEIGHT_SCALER: f64 = 1.0;
 const MINI_MAP_WIDTH_PERCENT: i32 = 30;
 const EPSILON: f64 = 0.001;
@@ -27,7 +27,6 @@ const DO_ROT_RIGHT: u32 = 0x0020;
 //const DO_USE: u32 = 0x0080;
 //const DO_SHOOT: u32 = 0x0100;
 
-const MAP_EMPTY: u8 = 0;
 const MAP_EDGE: u8 = u8::MAX;
 const WALL_COLORS: &[RGB] = &[MAGENTA, BROWN, CYAN, RED, GREEN, YELLOW, BLUE];
 const WALL_SHADINGS: &[u32] = &[100, 80, 60, 80];
@@ -71,45 +70,21 @@ impl RayCaster {
     }
 
     fn move_and_keep_away_from_obstacles(&mut self, distance: f64, pdx: f64, pdy: f64) {
-        // move + check collision on X
+        // perform move
         let move_x = pdx * distance;
+        let move_y = pdy * distance;
         self.pos_x += move_x;
-        let xx = if move_x < 0.0 {
-            (self.pos_x - MIN_DISTANCE_TO_WALL) as i32
-        } else {
-            (self.pos_x + MIN_DISTANCE_TO_WALL) as i32
-        };
-        let coll_x = (xx < 0) || (xx >= self.map_width) || {
-            let yl = (self.pos_y - MIN_DISTANCE_TO_WALL) as i32;
-            let yh = (self.pos_y + MIN_DISTANCE_TO_WALL) as i32;
-            yl < 0
-                || yh >= self.map_height
-                || self.map[(yl * self.map_width + xx) as usize] != MAP_EMPTY
-                || self.map[(yh * self.map_width + xx) as usize] != MAP_EMPTY
-        };
-        if coll_x {
-            // collision on X => restore X coordinate
+        self.pos_y += move_y;
+        // compute self position + position ahead of movement direction, as integers
+        let px = self.pos_x as i32;
+        let py = self.pos_y as i32;
+        let ax = (self.pos_x + MIN_DISTANCE_TO_WALL * move_x.signum()) as i32;
+        let ay = (self.pos_y + MIN_DISTANCE_TO_WALL * move_y.signum()) as i32;
+        // check for collisions on each axis
+        if ax < 0 || ax >= self.map_width || self.map[(py * self.map_width + ax) as usize] != 0 {
             self.pos_x -= move_x;
         }
-
-        // move + check collision on Y
-        let move_y = pdy * distance;
-        self.pos_y += move_y;
-        let yy = if move_y < 0.0 {
-            (self.pos_y - MIN_DISTANCE_TO_WALL) as i32
-        } else {
-            (self.pos_y + MIN_DISTANCE_TO_WALL) as i32
-        };
-        let coll_y = (yy < 0) || (yy >= self.map_height) || {
-            let xl = (self.pos_x - MIN_DISTANCE_TO_WALL) as i32;
-            let xh = (self.pos_x + MIN_DISTANCE_TO_WALL) as i32;
-            xl < 0
-                || xh >= self.map_width
-                || self.map[(yy * self.map_width + xl) as usize] != MAP_EMPTY
-                || self.map[(yy * self.map_width + xh) as usize] != MAP_EMPTY
-        };
-        if coll_y {
-            // collision on Y => restore Y coordinate
+        if ay < 0 || ay >= self.map_height || self.map[(ay * self.map_width + px) as usize] != 0 {
             self.pos_y -= move_y;
         }
     }
@@ -238,7 +213,7 @@ impl RayCaster {
                 } else {
                     self.map[map_idx as usize]
                 };
-                if m != MAP_EMPTY {
+                if m != 0 {
                     return (dist_x, m, orient_x);
                 }
                 // continue on the X axis
@@ -252,7 +227,7 @@ impl RayCaster {
                 } else {
                     self.map[map_idx as usize]
                 };
-                if m != MAP_EMPTY {
+                if m != 0 {
                     return (dist_y, m, orient_y);
                 }
                 // continue on the Y axis
@@ -294,7 +269,7 @@ impl RayCaster {
 
     #[inline]
     fn get_wall_color(wall: u8, orientation: u8) -> RGB {
-        if wall == MAP_EMPTY || wall == MAP_EDGE {
+        if wall == 0 || wall == MAP_EDGE {
             BLACK
         } else {
             let color = WALL_COLORS[(wall as usize) % WALL_COLORS.len()];
@@ -452,7 +427,7 @@ impl RayCasterBuilder {
                 }
                 '.' => {
                     // empty space
-                    self.0.map[idx as usize] = MAP_EMPTY;
+                    self.0.map[idx as usize] = 0;
                     idx += 1;
                 }
                 '@' => {
