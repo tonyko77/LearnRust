@@ -10,11 +10,12 @@ const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 const MINI_MAP_WIDTH_PERCENT: u32 = 40;
 const WALK_SPEED: f64 = 4.0;
 const STRAFE_SPEED: f64 = WALK_SPEED;
-const ROTATE_SPEED: f64 = 100.0;
+const ROTATE_SPEED: f64 = 120.0;
 const MIN_DISTANCE_TO_WALL: f64 = 0.1;
 const MINIMAP_DIRECTION_LEN: f64 = 10.0;
-//const HALF_HORIZ_FOV: f64 = 45.0;
+const HALF_HORIZ_FOV: f64 = 45.0;
 const EPSILON: f64 = 0.001;
+const WALL_HEIGHT_SCALER: f64 = 0.5;
 
 const DO_WALK_FWD: u32 = 0x0001;
 const DO_WALK_BACK: u32 = 0x0002;
@@ -22,15 +23,17 @@ const DO_STRAFE_LEFT: u32 = 0x0004;
 const DO_STRAFE_RIGHT: u32 = 0x0008;
 const DO_ROT_LEFT: u32 = 0x0010;
 const DO_ROT_RIGHT: u32 = 0x0020;
-//const          DO_RUN: u32 = 0x0040;
-//const          DO_USE: u32 = 0x0080;
-//const        DO_SHOOT: u32 = 0x0100;
+//const DO_RUN: u32 = 0x0040;
+//const DO_USE: u32 = 0x0080;
+//const DO_SHOOT: u32 = 0x0100;
 
 const MAP_EMPTY: u8 = 0;
 const MAP_EDGE: u8 = u8::MAX;
 
 const WALL_COLORS: &[RGB] = &[MAGENTA, BROWN, CYAN, RED, GREEN, YELLOW, BLUE];
-const WALL_SHADINGS: &[u32] = &[100, 80, 50, 70];
+const WALL_SHADINGS: &[u32] = &[100, 80, 60, 80];
+
+//-------------------------------------------------------
 
 /// `RayCaster` engine. Must be built using [`RayCasterBuilder`].
 pub struct RayCaster {
@@ -156,19 +159,31 @@ impl RayCaster {
         let py = (self.pos_y * (ms as f64)) as i32;
 
         // cast rays to draw the walls
-        // TODO only one ray for now
-        let delta_angle = 0.0;
-        let angle = add_angles_in_degrees(self.pos_angle, delta_angle);
-        let (dist, wall, orientation) = self.compute_ray(angle);
-        let color = Self::get_wall_color(wall, orientation);
-
-        // draw the ray on the mini map
-        let ray_x = ((angle * DEG_TO_RAD).cos() * dist * (ms as f64)) as i32;
-        let ray_y = ((angle * DEG_TO_RAD).sin() * dist * (ms as f64)) as i32;
-        painter.draw_line(px, py, px + ray_x, py + ray_y, color);
-
-        // draw the result of the ray cast on the 3D view
-        // TODO ...
+        let mut fov_angle = add_angles_in_degrees(self.pos_angle, -HALF_HORIZ_FOV);
+        let fov_step = 2.0 * HALF_HORIZ_FOV / (self.view_width as f64);
+        for x in 0..self.view_width {
+            let (dist, wall, orientation) = self.compute_ray(fov_angle);
+            let color = Self::get_wall_color(wall, orientation);
+            // draw SOME of the rays on the mini map
+            if (x & 0x0F) == 0 {
+                let ray_x = ((fov_angle * DEG_TO_RAD).cos() * dist * (ms as f64)) as i32;
+                let ray_y = ((fov_angle * DEG_TO_RAD).sin() * dist * (ms as f64)) as i32;
+                painter.draw_line(px, py, px + ray_x, py + ray_y, color);
+            }
+            // draw the result of the ray cast on the 3D view
+            let s = WALL_HEIGHT_SCALER / dist;
+            if s > 0.01 {
+                let h = if s >= 1.0 {
+                    self.view_height
+                } else {
+                    (s * (self.view_height as f64)) as i32
+                };
+                let y = (self.view_height - h) / 2;
+                painter.draw_vert_line(x + self.view_x, y, y + h, color);
+            }
+            // move to next ray
+            fov_angle += fov_step;
+        }
 
         // after the rays, draw the player on the mini map
         // (so it appears over the rays)
@@ -179,7 +194,8 @@ impl RayCaster {
         painter.draw_line(px, py, px + dirx, py + diry, ORANGE);
     }
 
-    /// Computes: distance to wall, wall color index, wall orientation(0=N, 1=W, 2=S, 3=E)
+    /// Computes: distance to wall, wall color index, wall orientation(0=N, 1=W, 2=S, 3=E).
+    /// Thanks to [javidx9 a.k.a. olc](https://www.youtube.com/watch?v=NbSee-XM7WA)
     fn compute_ray(&self, angle: f64) -> (f64, u8, u8) {
         let sin = (angle * DEG_TO_RAD).sin();
         let cos = (angle * DEG_TO_RAD).cos();
@@ -294,6 +310,8 @@ impl RayCaster {
         }
     }
 }
+
+//-------------------------------------------------------
 
 impl GraphicsLoop for RayCaster {
     fn handle_event(&mut self, event: &Event) -> bool {

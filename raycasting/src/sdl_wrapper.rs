@@ -6,8 +6,7 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 
-use std::time::{Instant, Duration};
-
+use std::time::{Duration, Instant};
 
 /// Enum for if/how to slep during each game loop execution.
 #[derive(PartialEq, Eq)]
@@ -16,7 +15,6 @@ pub enum SleepMethod {
     YIELD,
     SLEEP(u32),
 }
-
 
 /// The configuration to be used for initializing SDL.
 pub struct SdlConfiguration {
@@ -28,7 +26,13 @@ pub struct SdlConfiguration {
 }
 
 impl SdlConfiguration {
-    pub fn new(title: &str, width: u32, height: u32, pixel_size: u32, sleep_method: SleepMethod) -> Self {
+    pub fn new(
+        title: &str,
+        width: u32,
+        height: u32,
+        pixel_size: u32,
+        sleep_method: SleepMethod,
+    ) -> Self {
         SdlConfiguration {
             title: String::from(title),
             width,
@@ -38,7 +42,6 @@ impl SdlConfiguration {
         }
     }
 }
-
 
 /// Trait to be implemented by clients of `run_sdl_loop`.
 /// Its methods will be called periodically, during the main game loop.
@@ -52,7 +55,6 @@ pub trait GraphicsLoop {
     /// Paint the world, based on the updated internal state.
     fn paint(&self, painter: &mut dyn Painter);
 }
-
 
 /// Main function to run the continuous SDL loop
 pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> Result<(), String> {
@@ -71,8 +73,7 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         .opengl()
         .build()
         .map_err(|e| e.to_string())?;
-    let mut canvas =
-        window.into_canvas().build().map_err(|e| e.to_string())?;
+    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
 
     // create texture, to paint on
     let texture_creator = canvas.texture_creator();
@@ -107,7 +108,10 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         if last_fps != timer.fps {
             last_fps = timer.fps;
             let title_with_fps = format!("{} - FPS: {}", cfg.title, last_fps);
-            canvas.window_mut().set_title(&title_with_fps).map_err(|e| e.to_string())?;
+            canvas
+                .window_mut()
+                .set_title(&title_with_fps)
+                .map_err(|e| e.to_string())?;
         }
 
         // update the internal state
@@ -138,17 +142,16 @@ pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> 
         match cfg.sleep_method {
             SleepMethod::SLEEP(nanos) => {
                 std::thread::sleep(Duration::new(0, nanos));
-            },
+            }
             SleepMethod::YIELD => {
                 std::thread::yield_now();
-            },
-            _ => { }
+            }
+            _ => {}
         }
     }
 
     Ok(())
 }
-
 
 //--------------------------------
 // Internal details
@@ -171,7 +174,6 @@ impl<'a> Painter for InternalTexturePainter<'a> {
     }
 }
 
-
 struct FpsAndElapsedCounter {
     time_sum: f64,
     time_cnt: u32,
@@ -181,11 +183,11 @@ struct FpsAndElapsedCounter {
 
 impl FpsAndElapsedCounter {
     fn new() -> Self {
-        FpsAndElapsedCounter { 
+        FpsAndElapsedCounter {
             time_cnt: 0,
             time_sum: 0.0,
             last_moment: Instant::now(),
-            fps: 0
+            fps: 0,
         }
     }
 
@@ -200,7 +202,11 @@ impl FpsAndElapsedCounter {
         self.time_cnt += 1;
         if self.time_sum >= 1.0 {
             let avg = self.time_sum / (self.time_cnt as f64);
-            self.fps = if avg <= 0.0 { 999999 } else { (1.0 / avg) as u32 };
+            self.fps = if avg <= 0.0 {
+                999999
+            } else {
+                (1.0 / avg) as u32
+            };
             self.time_cnt = 0;
             self.time_sum = 0.0;
         }

@@ -6,13 +6,12 @@
 
 use raycasting::*;
 
-
 const MAP_WIDTH: u32 = 10;
 const MAP_HEIGHT: u32 = 10;
 const MAP: &'static str = concat!(
     "CCCCCCCCCC",
     "C........C",
-    "C....EFE.C",
+    "C....FEF.C",
     "C..FEF.F.C",
     "C..E...EFC",
     "C........C",
@@ -28,7 +27,6 @@ const PIXEL_SIZE: u32 = 1;
 
 const SHOULD_SLEEP: SleepMethod = SleepMethod::YIELD;
 
-
 fn main() {
     let mut builder = RayCasterBuilder::new();
     builder
@@ -43,14 +41,14 @@ fn main() {
         SCR_WIDTH,
         SCR_HEIGHT,
         PIXEL_SIZE,
-        SHOULD_SLEEP);
+        SHOULD_SLEEP,
+    );
 
     // main game loop
     let res = raycasting::run_sdl_loop(&sdl_config, &mut raycaster);
     if let Err(msg) = res {
         println!("ERROR: {msg}");
-    }
-    else {
+    } else {
         println!("Raycaster demo finished OK :)");
     }
 }
