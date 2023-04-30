@@ -1,5 +1,11 @@
 //! The ray casting engine/demo.
 
+/*
+ * STILL TO DO:
+ *  1. Textures
+ *  2. Floor + ceiling tiles
+ */
+
 use crate::*;
 use sdl2::keyboard::*;
 
@@ -8,8 +14,8 @@ const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 
 // adjustments for engine
 const WALK_SPEED: f64 = 2.5;
-const STRAFE_SPEED: f64 = WALK_SPEED;
 const ROTATE_SPEED: f64 = 60.0;
+const RUN_MULTIPLIER: f64 = 2.5;
 const MIN_DISTANCE_TO_WALL: f64 = 0.25;
 const HALF_HORIZ_FOV: f64 = 23.0;
 const WALL_HEIGHT_SCALER: f64 = 1.0;
@@ -17,15 +23,23 @@ const MINI_MAP_WIDTH_PERCENT: i32 = 30;
 const EPSILON: f64 = 0.001;
 
 // bit flags for keys
-const DO_WALK_FWD: u32 = 0x0001;
-const DO_WALK_BACK: u32 = 0x0002;
-const DO_STRAFE_LEFT: u32 = 0x0004;
-const DO_STRAFE_RIGHT: u32 = 0x0008;
-const DO_ROT_LEFT: u32 = 0x0010;
-const DO_ROT_RIGHT: u32 = 0x0020;
-//const DO_RUN: u32 = 0x0040;
-//const DO_USE: u32 = 0x0080;
-//const DO_SHOOT: u32 = 0x0100;
+const DO_WALK_FWD: u32 = 0x01;
+const DO_WALK_BACK: u32 = 0x02;
+const DO_ROT_LEFT: u32 = 0x04;
+const DO_ROT_RIGHT: u32 = 0x08;
+const DO_STRAFE_LEFT: u32 = 0x10;
+const DO_STRAFE_RIGHT: u32 = 0x20;
+const DO_RUN: u32 = 0x40;
+
+const KEY_PAIRS: &[(Keycode, u32)] = &[
+    (Keycode::W, DO_WALK_FWD),
+    (Keycode::S, DO_WALK_BACK),
+    (Keycode::A, DO_ROT_LEFT),
+    (Keycode::D, DO_ROT_RIGHT),
+    (Keycode::Q, DO_STRAFE_LEFT),
+    (Keycode::E, DO_STRAFE_RIGHT),
+    (Keycode::LShift, DO_RUN),
+];
 
 const MAP_EDGE: u8 = u8::MAX;
 const WALL_COLORS: &[RGB] = &[MAGENTA, BROWN, CYAN, RED, GREEN, YELLOW, BLUE];
@@ -243,27 +257,19 @@ impl RayCaster {
 
     #[inline]
     fn handle_key_down(&mut self, key: &Keycode) {
-        match *key {
-            Keycode::W => self.keys |= DO_WALK_FWD,
-            Keycode::S => self.keys |= DO_WALK_BACK,
-            Keycode::A => self.keys |= DO_ROT_LEFT,
-            Keycode::D => self.keys |= DO_ROT_RIGHT,
-            Keycode::Q => self.keys |= DO_STRAFE_LEFT,
-            Keycode::E => self.keys |= DO_STRAFE_RIGHT,
-            _ => {}
+        for p in KEY_PAIRS {
+            if *key == p.0 {
+                self.keys |= p.1;
+            }
         }
     }
 
     #[inline]
     fn handle_key_up(&mut self, key: &Keycode) {
-        match *key {
-            Keycode::W => self.keys &= !DO_WALK_FWD,
-            Keycode::S => self.keys &= !DO_WALK_BACK,
-            Keycode::A => self.keys &= !DO_ROT_LEFT,
-            Keycode::D => self.keys &= !DO_ROT_RIGHT,
-            Keycode::Q => self.keys &= !DO_STRAFE_LEFT,
-            Keycode::E => self.keys &= !DO_STRAFE_RIGHT,
-            _ => {}
+        for p in KEY_PAIRS {
+            if *key == p.0 {
+                self.keys &= !p.1;
+            }
         }
     }
 
@@ -326,26 +332,32 @@ impl GraphicsLoop for RayCaster {
     }
 
     fn update_state(&mut self, elapsed_time: f64) -> bool {
+        let mult = if self.is_key_pressed(DO_RUN) {
+            RUN_MULTIPLIER
+        } else {
+            1.0
+        };
+
         // handle movement
         if self.is_key_pressed(DO_WALK_FWD) {
-            self.walk(elapsed_time * WALK_SPEED);
+            self.walk(mult * WALK_SPEED * elapsed_time);
         }
         if self.is_key_pressed(DO_WALK_BACK) {
-            self.walk(-elapsed_time * WALK_SPEED);
+            self.walk(-mult * WALK_SPEED * elapsed_time);
         }
 
         if self.is_key_pressed(DO_STRAFE_LEFT) {
-            self.strafe(elapsed_time * STRAFE_SPEED);
+            self.strafe(mult * WALK_SPEED * elapsed_time);
         }
         if self.is_key_pressed(DO_STRAFE_RIGHT) {
-            self.strafe(-elapsed_time * STRAFE_SPEED);
+            self.strafe(-mult * WALK_SPEED * elapsed_time);
         }
 
         if self.is_key_pressed(DO_ROT_LEFT) {
-            self.rotate(-elapsed_time * ROTATE_SPEED);
+            self.rotate(-mult * ROTATE_SPEED * elapsed_time);
         }
         if self.is_key_pressed(DO_ROT_RIGHT) {
-            self.rotate(elapsed_time * ROTATE_SPEED);
+            self.rotate(mult * ROTATE_SPEED * elapsed_time);
         }
 
         true
