@@ -7,7 +7,6 @@ pub struct DoomGame {
     // TODO to be continued ...
 }
 
-
 impl DoomGame {
     pub fn new(wad_data: wad::WadData) -> Result<DoomGame, String> {
         Self::validate_wad_data(&wad_data)?;
@@ -22,9 +21,14 @@ impl DoomGame {
         }
         // TODO - TEMP logging
         println!("[DBG] WAD Lump Count: {lump_count}");
-        for i in 0 .. lump_count {
+        for i in 0..lump_count {
             let lump = wad_data.get_lump(i)?;
-            println!("[DBG]   => {:4}: {:8} -> len={}", i, lump.name, lump.bytes.len());
+            println!(
+                "[DBG]   => {:4}: {:8} -> len={}",
+                i,
+                lump.name,
+                lump.bytes.len()
+            );
         }
 
         // TODO to be continued ...
@@ -33,5 +37,4 @@ impl DoomGame {
     }
 
     // TODO to be continued ...
-
 }

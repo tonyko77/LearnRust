@@ -1,4 +1,4 @@
-// WAD loader and parser
+//! WAD loader and parser
 
 use crate::utils;
 
@@ -8,23 +8,21 @@ pub enum WadKind {
     PWAD,
 }
 
-
 pub struct LumpData<'a> {
     pub name: &'a str,
     pub bytes: &'a [u8],
 }
 
-
-// see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes001/notes
+/// Stores all the bytes from a WAD file.
+/// Also provides raw access to the WAD directory and lumps.
+/// See [DIYDoom, Notes001](https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes001/notes).
 pub struct WadData {
     lump_count: usize,
     dir_offset: usize,
     wad_bytes: Vec<u8>,
 }
 
-
 impl WadData {
-
     pub fn load(wad_path: &str, expected_kind: WadKind) -> Result<WadData, String> {
         // read WAD file bytes
         let wad_read = std::fs::read(wad_path);
@@ -60,7 +58,7 @@ impl WadData {
         Ok(WadData {
             lump_count,
             dir_offset,
-            wad_bytes
+            wad_bytes,
         })
     }
 
@@ -70,30 +68,33 @@ impl WadData {
 
     pub fn get_lump(&self, idx: usize) -> Result<LumpData, String> {
         if idx >= self.lump_count {
-            Err(format!("Invalid lump index: index {idx} >= count {} ", self.lump_count))
-        }
-        else {
+            Err(format!(
+                "Invalid lump index: index {idx} >= count {} ",
+                self.lump_count
+            ))
+        } else {
             let offs = self.dir_offset + 16 * idx;
-            let lump_start = utils::buf_to_u32(&self.wad_bytes[offs .. (offs+4)]) as usize;
-            let lump_size = utils::buf_to_u32(&self.wad_bytes[(offs+4) .. (offs+8)]) as usize;
+            let lump_start = utils::buf_to_u32(&self.wad_bytes[offs..(offs + 4)]) as usize;
+            let lump_size = utils::buf_to_u32(&self.wad_bytes[(offs + 4)..(offs + 8)]) as usize;
             let wad_len = self.wad_bytes.len();
             let lump_end = lump_start + lump_size;
             if lump_end >= wad_len {
-                Err(format!("Lump too big: offs {lump_start} + size {lump_size} >= wad len {wad_len} "))
-            }
-            else {
+                Err(format!(
+                    "Lump too big: offs {lump_start} + size {lump_size} >= wad len {wad_len} "
+                ))
+            } else {
                 let name_start = offs + 8;
                 let mut name_end = offs + 16;
                 // dismiss all null bytes at the end
                 while (name_end > name_start) && (0 == self.wad_bytes[name_end - 1]) {
                     name_end -= 1;
                 }
-                let name_bytes = &self.wad_bytes[name_start .. name_end];
+                let name_bytes = &self.wad_bytes[name_start..name_end];
                 let name_str = std::str::from_utf8(name_bytes);
                 match name_str {
                     Ok(name) => Ok(LumpData {
                         name,
-                        bytes: &self.wad_bytes[lump_start .. lump_end],
+                        bytes: &self.wad_bytes[lump_start..lump_end],
                     }),
                     // this should not happen anyway - lump names should always be ASCII
                     Err(_) => Err(format!("Invalid lump name at index {idx}")),
@@ -101,5 +102,4 @@ impl WadData {
             }
         }
     }
-
 }
