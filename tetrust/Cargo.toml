@@ -8,8 +8,6 @@ edition = "2021"
 [dependencies]
 fastrand = "1.9"
 sdl2 = "0.35"
-# TODO replace OLC with SDL !!
-olc_pixel_game_engine = { git = "https://github.com/sadikovi/olcPixelGameEngine-rs", branch = "master" }
 
 [profile.dev]
 # optimize only the dependencies

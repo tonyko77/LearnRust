@@ -6,13 +6,18 @@
 
 use tetrust::*;
 
-const SCR_WIDTH: i32 = 320;
-const SCR_HEIGHT: i32 = 240;
+const SCR_WIDTH: i32 = 400;
+const SCR_HEIGHT: i32 = 300;
 const PIX_SIZE: i32 = 3;
 const SLEEP_KIND: SleepKind = SleepKind::YIELD;
 
 fn main() {
     let mut example = ExampleProgram {};
+
+    // TEST: print ALL tetriminoes
+    for i in 0..7 {
+        print_tetrimino(i);
+    }
 
     // main game loop
     let sdl_config = SdlConfiguration::new(
@@ -30,6 +35,49 @@ fn main() {
     }
 }
 
+//----------------------------
+// TEST: print tetriminoes
+fn print_tetrimino(idx: usize) {
+    let mut tetr = Tetrimino::from_index(idx);
+    let mut rots: Vec<String> = vec![];
+
+    println!(
+        "--> Tetrimino {} (color = {})",
+        tetr.name(),
+        tetr.color_idx()
+    );
+
+    // build strings for each rotation
+    for _ in 0..4 {
+        let mut bytes: [u8; 16] = ['.' as u8; 16];
+        // build a string with the tetrimino data
+        for i in 0..4 {
+            let x = tetr.x(i);
+            let y = tetr.y(i);
+            let idx = y * 4 + x + 4;
+            assert!(idx >= 0 && idx < 16, "Invalid index: {idx}");
+            bytes[idx as usize] = '#' as u8;
+        }
+        // save the string
+        let s = std::str::from_utf8(&bytes).unwrap();
+        rots.push(s.to_string());
+        // go to the next rotation
+        tetr.rotate_cw();
+    }
+
+    // print tetriminoes
+    assert_eq!(4, rots.len());
+    for i in 0..=3 {
+        for j in 0..=3 {
+            let s = rots[j].as_str();
+            let ss = &s[(i * 4)..=(i * 4 + 3)];
+            print!("   {ss}");
+        }
+        println!("");
+    }
+}
+
+//----------------------------
 // TEMPORARY demo
 struct ExampleProgram {}
 
