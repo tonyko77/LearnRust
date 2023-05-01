@@ -4,7 +4,8 @@
 //! * see [DIY Doom on GitHub](https://github.com/amroibrahim/DIYDoom)
 
 // This magic line prevents the opening of a terminal when launching the app
-//#![windows_subsystem = "windows"]
+// TODO - FIGURE THIS OUT !!!
+//#![cfg_attr(dev, windows_subsystem = "windows")]
 
 // TODO - TEMPORARYLY disable warnings for dead code
 #![allow(dead_code)]
@@ -20,11 +21,9 @@ use rustoom::*;
        - [later] continue with DOOM DIY: https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes002/notes
 */
 
-const WIDTH: u32 = 320;
-const HEIGHT: u32 = 240;
+const SCR_WIDTH: u32 = 320;
+const SCR_HEIGHT: u32 = 240;
 const PIX_SIZE: u32 = 3;
-const SCR_WIDTH: u32 = WIDTH * PIX_SIZE;
-const SCR_HEIGHT: u32 = HEIGHT * PIX_SIZE;
 
 fn main() -> Result<(), String> {
     let wad_path = "doom.wad";

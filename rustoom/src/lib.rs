@@ -1,7 +1,7 @@
 //! Main lib for the RustooM Doom-like engine/demo
 
 mod game;
-pub mod painter;
+mod painter;
 mod sdl_wrapper;
 mod utils;
 mod wad;
