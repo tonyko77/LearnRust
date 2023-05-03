@@ -1,8 +1,8 @@
 //! Simple ray-casting engine demo, using SDL2
 //! Inspired by [this YouTube clip](https://www.youtube.com/watch?v=gYRrGTC7GtA)
 
-// This magic line prevents the opening of a terminal when launching the app
-//#![windows_subsystem = "windows"]
+// This magic line prevents the opening of a terminal when launching a release build
+#![cfg_attr(not(any(test, debug_assertions)), windows_subsystem = "windows")]
 
 use raycasting::*;
 

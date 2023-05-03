@@ -1,8 +1,7 @@
 //! Main binary for TetRusT - Tetris-like game.
 
-// This magic line prevents the opening of a terminal when launching the app
-// TODO - FIGURE THIS OUT !!!
-//#![cfg_attr(dev, windows_subsystem = "windows")]
+// This magic line prevents the opening of a terminal when launching a release build
+#![cfg_attr(not(any(test, debug_assertions)), windows_subsystem = "windows")]
 
 use tetrust::*;
 
