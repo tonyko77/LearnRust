@@ -1,5 +1,6 @@
 //! WAD loader and parser
 
+use crate::map::*;
 use crate::utils;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,6 +21,7 @@ pub struct WadData {
     lump_count: usize,
     dir_offset: usize,
     wad_bytes: Vec<u8>,
+    map_indices: Vec<usize>,
 }
 
 impl WadData {
@@ -56,12 +58,13 @@ impl WadData {
         }
 
         // build and validate the result
-        let result = WadData {
+        let mut result = WadData {
             lump_count,
             dir_offset,
             wad_bytes,
+            map_indices: Vec::with_capacity(64),
         };
-        result.validate_wad_data()?;
+        result.parse_and_validate_wad_data()?;
 
         Ok(result)
     }
@@ -74,7 +77,7 @@ impl WadData {
     pub fn get_lump(&self, idx: usize) -> Result<LumpData, String> {
         if idx >= self.lump_count {
             Err(format!(
-                "Invalid lump index: index {idx} >= count {} ",
+                "Invalid lump index: {idx} >= count {} ",
                 self.lump_count
             ))
         } else {
@@ -108,27 +111,73 @@ impl WadData {
         }
     }
 
-    fn validate_wad_data(&self) -> Result<(), String> {
+    #[inline]
+    pub fn get_map_count(&self) -> usize {
+        self.map_indices.len()
+    }
+
+    pub fn get_map(&self, idx: usize) -> Result<LevelMap, String> {
+        if idx >= self.map_indices.len() {
+            Err(format!(
+                "Invalid map index: {idx} >= count {} ",
+                self.map_indices.len()
+            ))
+        } else {
+            let mi = self.map_indices[idx];
+            LevelMap::from_wad(&self, mi)
+        }
+    }
+
+    fn parse_and_validate_wad_data(&mut self) -> Result<(), String> {
         // check that all lumps are ok
         let lump_count = self.get_lump_count();
         if lump_count == 0 {
             return Err(String::from("WAD has no lumps"));
         }
-        // TODO - TEMP logging
-        println!("[DBG] WAD Lump Count: {lump_count}");
+        // check each lump
         for i in 0..lump_count {
             let lump = self.get_lump(i)?;
-            println!(
-                "[DBG]   => {:4}: {:8} -> len={}",
-                i,
-                lump.name,
-                lump.bytes.len()
-            );
+            // check for map start markers
+            if lump.bytes.len() == 0 && is_map_name(lump.name) {
+                self.map_indices.push(i);
+            }
+            // TODO check for other known lumps ..
         }
-
-        // TODO to be continued ...
+        // check maps
+        if self.map_indices.is_empty() {
+            return Err(String::from("WAD has no maps"));
+        }
+        for mi in 0..self.map_indices.len() {
+            self.get_map(mi)?;
+        }
 
         Ok(())
     }
+}
 
+//-----------------------------
+//  Internal utils
+
+fn is_map_name(name: &str) -> bool {
+    const E: u8 = 'E' as u8;
+    const M: u8 = 'M' as u8;
+    const A: u8 = 'A' as u8;
+    const P: u8 = 'P' as u8;
+    const D0: u8 = '0' as u8;
+    const D9: u8 = '9' as u8;
+
+    let b = name.as_bytes();
+    if b.len() == 4 {
+        (b[0] == E) && (b[1] >= D0) && (b[1] <= D9) && (b[2] == M) && (b[3] >= D0) && (b[3] <= D9)
+    } else if b.len() == 5 {
+        (b[0] == M)
+            && (b[1] == A)
+            && (b[2] == P)
+            && (b[3] >= D0)
+            && (b[3] <= D9)
+            && (b[4] >= D0)
+            && (b[4] <= D9)
+    } else {
+        false
+    }
 }

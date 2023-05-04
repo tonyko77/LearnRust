@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 fastrand = "1.9"
 sdl2 = "0.35"
+debug_print = "1"
 
 [profile.dev]
 # optimize only the dependencies
