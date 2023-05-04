@@ -124,9 +124,11 @@ impl WadData {
             ))
         } else {
             let mi = self.map_indices[idx];
-            LevelMap::from_wad(&self, mi)
+            self.build_map(mi)
         }
     }
+
+    //-----------
 
     fn parse_and_validate_wad_data(&mut self) -> Result<(), String> {
         // check that all lumps are ok
@@ -152,6 +154,39 @@ impl WadData {
         }
 
         Ok(())
+    }
+
+    fn build_map(&self, lump_idx: usize) -> Result<LevelMap, String> {
+        let lump = self.get_lump(lump_idx)?;
+        let mut map = LevelMap::new(lump.name);
+        // parse map lumps
+        for i in (lump_idx + 1)..(lump_idx + 13) {
+            let lump = self.get_lump(i)?;
+            let must_break = match lump.name {
+                "VERTEXES" => {
+                    map.parse_vertexes(&lump.bytes);
+                    false
+                }
+                "LINEDEFS" => {
+                    map.parse_line_defs(&lump.bytes);
+                    false
+                }
+                "THINGS" => false,   // TODO...
+                "SIDEDEFS" => false, // TODO...
+                "SEGS" => false,     // TODO...
+                "SSECTORS" => false, // TODO...
+                "NODES" => false,    // TODO...
+                "SECTORS" => false,  // TODO...
+                "REJECT" => false,   // TODO...
+                "BLOCKMAP" => false, // TODO...
+                _ => true,
+            };
+            if must_break {
+                break;
+            }
+        }
+        // done
+        Ok(map)
     }
 }
 
