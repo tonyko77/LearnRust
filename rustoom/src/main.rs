@@ -20,7 +20,7 @@ use rustoom::*;
 // const PIX_SIZE: u32 = 3;
 
 fn main() -> Result<(), String> {
-    let wad_path = "doom.wad";
+    let wad_path = "DOOM1.WAD";
     let wad_data = WadData::load(wad_path, WadKind::IWAD)?;
     let _doom_game = DoomGame::new(wad_data)?;
 
