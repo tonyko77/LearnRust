@@ -15,16 +15,32 @@
 
 use rustoom::*;
 
-// const SCR_WIDTH: u32 = 320;
-// const SCR_HEIGHT: u32 = 240;
-// const PIX_SIZE: u32 = 3;
+const SCR_WIDTH: i32 = 400;
+const SCR_HEIGHT: i32 = 300;
+const PIXEL_SIZE: i32 = 2;
+
+const SLEEP_KIND: SleepKind = SleepKind::YIELD;
+const WAD_PATH: &str = "DOOM1.WAD";
+
 
 fn main() -> Result<(), String> {
-    let wad_path = "DOOM1.WAD";
-    let wad_data = WadData::load(wad_path, WadKind::IWAD)?;
-    let _doom_game = DoomGame::new(wad_data)?;
 
-    println!("*** Doom game loaded ok ***");
+
+    // load the wad
+    let wad_data = WadData::load(WAD_PATH, WadKind::IWAD)?;
+    println!("*** WAD loaded ok: {WAD_PATH} ***");
+
+    // build the game engine
+    let mut doom_game = DoomGame::new(wad_data, SCR_WIDTH, SCR_HEIGHT);
+
+    // main game loop
+    let sdl_config = SdlConfiguration::new("RusTooM", SCR_WIDTH, SCR_HEIGHT, PIXEL_SIZE, SLEEP_KIND);
+    let res = run_sdl_loop(&sdl_config, &mut doom_game);
+    if let Err(msg) = res {
+        println!("ERROR: {msg}");
+    } else {
+        println!("RusTooM finished OK :)");
+    }
 
     Ok(())
 }

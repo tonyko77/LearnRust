@@ -55,13 +55,18 @@ impl WadData {
             return Err(format!("Invalid WAD type: {wad_kind_str}"));
         }
 
-        Ok(WadData {
+        // build and validate the result
+        let result = WadData {
             lump_count,
             dir_offset,
             wad_bytes,
-        })
+        };
+        result.validate_wad_data()?;
+
+        Ok(result)
     }
 
+    #[inline]
     pub fn get_lump_count(&self) -> usize {
         self.lump_count
     }
@@ -102,4 +107,28 @@ impl WadData {
             }
         }
     }
+
+    fn validate_wad_data(&self) -> Result<(), String> {
+        // check that all lumps are ok
+        let lump_count = self.get_lump_count();
+        if lump_count == 0 {
+            return Err(String::from("WAD has no lumps"));
+        }
+        // TODO - TEMP logging
+        println!("[DBG] WAD Lump Count: {lump_count}");
+        for i in 0..lump_count {
+            let lump = self.get_lump(i)?;
+            println!(
+                "[DBG]   => {:4}: {:8} -> len={}",
+                i,
+                lump.name,
+                lump.bytes.len()
+            );
+        }
+
+        // TODO to be continued ...
+
+        Ok(())
+    }
+
 }

@@ -1,40 +1,43 @@
 // Main DOOM game
 
-use crate::wad;
+use sdl2::event::Event;
+use crate::{wad, Painter, GraphicsLoop, RGB};
 
 pub struct DoomGame {
     wad_data: wad::WadData,
+    scr_width: i32,
+    scr_height: i32,
     // TODO to be continued ...
 }
 
 impl DoomGame {
-    pub fn new(wad_data: wad::WadData) -> Result<DoomGame, String> {
-        Self::validate_wad_data(&wad_data)?;
-        Ok(DoomGame { wad_data })
-    }
-
-    fn validate_wad_data(wad_data: &wad::WadData) -> Result<(), String> {
-        // check that all lumps are ok
-        let lump_count = wad_data.get_lump_count();
-        if lump_count == 0 {
-            return Err(String::from("WAD has no lumps"));
-        }
-        // TODO - TEMP logging
-        println!("[DBG] WAD Lump Count: {lump_count}");
-        for i in 0..lump_count {
-            let lump = wad_data.get_lump(i)?;
-            println!(
-                "[DBG]   => {:4}: {:8} -> len={}",
-                i,
-                lump.name,
-                lump.bytes.len()
-            );
-        }
-
-        // TODO to be continued ...
-
-        Ok(())
+    pub fn new(wad_data: wad::WadData, scr_width: i32, scr_height: i32) -> DoomGame {
+        DoomGame { wad_data, scr_width, scr_height }
     }
 
     // TODO to be continued ...
+}
+
+
+impl GraphicsLoop for DoomGame {
+    fn handle_event(&mut self, event: &Event) -> bool {
+       true 
+    }
+
+    fn update_state(&mut self, elapsed_time: f64) -> bool {
+        true
+    }
+
+    fn paint(&self, painter: &mut dyn Painter) {
+        // TEMPORARY - draw random pixels
+        for y in 0..self.scr_height {
+            for x in 0..self.scr_width {
+                let r: u8 = fastrand::u8(0..=255);
+                let g: u8 = fastrand::u8(0..=255);
+                let b: u8 = fastrand::u8(0..=255);
+                painter.draw_pixel(x, y, RGB::from(r, g, b));
+            }
+        }
+    }
+
 }

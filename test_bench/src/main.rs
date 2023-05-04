@@ -1,11 +1,18 @@
-// RUST test bench
+//! RUST test bench
 
-#[derive(Debug)]
+#![allow(dead_code)]
+#![allow(unused_variables)]
+
+
+
+
+//----------------------------------------------------
+// Test how to use a struct to borrow a variable
 struct XStruct<'a> {
     x: &'a mut i32,
 }
 
-fn main() {
+fn _borrow_main() {
     let mut xowner = 1; // Declare a mutable variable x
     let x_struct = XStruct { x: &mut xowner }; // Pass a mutable reference to x
 
@@ -21,8 +28,9 @@ fn main() {
     println!("The value of x is {:?}.", xowner);
 }
 
-
-fn _cast_main() {
+//----------------------------------------------------
+// Test how signed<-> unsigned casting works
+fn main() {
     // test casting signed <-> unsigned
     let sgn: i8 = -1;
     println!("i8={sgn} => i8->u8={} ,", sgn as u8);

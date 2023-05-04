@@ -1,7 +1,5 @@
 //  Various utilities
 
-// TODO - doc comments EVERYWHERE !!!
-
 
 #[inline]
 pub fn buf_to_u16(buf: &[u8]) -> u16 {
