@@ -7,10 +7,7 @@
 #![cfg_attr(not(any(test, debug_assertions)), windows_subsystem = "windows")]
 
 /*
-   TODO:
-       - [DONE] load WAD
-       - [next] figure out how to use SDL2 to DRAW BIG PIXELS in a FAST WAY !!!
-       - [later] continue with DOOM DIY: https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes002/notes
+   TODO: continue with DOOM DIY: https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes002/notes
 */
 
 use rustoom::*;
@@ -22,19 +19,17 @@ const PIXEL_SIZE: i32 = 2;
 const SLEEP_KIND: SleepKind = SleepKind::YIELD;
 const WAD_PATH: &str = "DOOM1.WAD";
 
-
 fn main() -> Result<(), String> {
-
-
     // load the wad
     let wad_data = WadData::load(WAD_PATH, WadKind::IWAD)?;
     println!("*** WAD loaded ok: {WAD_PATH} ***");
 
     // build the game engine
-    let mut doom_game = DoomGame::new(wad_data, SCR_WIDTH, SCR_HEIGHT);
+    let mut doom_game = DoomGame::new(wad_data, SCR_WIDTH, SCR_HEIGHT)?;
 
     // main game loop
-    let sdl_config = SdlConfiguration::new("RusTooM", SCR_WIDTH, SCR_HEIGHT, PIXEL_SIZE, SLEEP_KIND);
+    let sdl_config =
+        SdlConfiguration::new("RusTooM", SCR_WIDTH, SCR_HEIGHT, PIXEL_SIZE, SLEEP_KIND);
     let res = run_sdl_loop(&sdl_config, &mut doom_game);
     if let Err(msg) = res {
         println!("ERROR: {msg}");

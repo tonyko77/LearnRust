@@ -6,14 +6,19 @@ use debug_print::*;
 
 #[derive(Debug)]
 pub struct Vertex {
-    pub x: i32,
-    pub y: i32,
+    pub x: i16,
+    pub y: i16,
 }
 
 #[derive(Debug)]
 pub struct LineDef {
-    pub v1_idx: usize,
-    pub v2_idx: usize,
+    pub v1_idx: u16,
+    pub v2_idx: u16,
+    pub flags: u16,
+    pub action: u16,
+    pub sect_tag: u16,
+    pub front_side_idx: u16,
+    pub back_side_idx: u16,
 }
 
 pub struct LevelMap {
@@ -77,56 +82,71 @@ impl LevelMap {
         for i in 0..vertex_cnt {
             let idx = i << 2;
             let v = Vertex {
-                x: buf_to_i16(&lump.bytes[idx..=idx + 1]) as i32,
-                y: buf_to_i16(&lump.bytes[idx + 2..=idx + 3]) as i32,
+                x: buf_to_i16(&lump.bytes[idx + 0..=idx + 1]),
+                y: buf_to_i16(&lump.bytes[idx + 2..=idx + 3]),
             };
-            debug_println!("  -> Vertex({i} of {vertex_cnt}: {v:?}");
+            //debug_println!("  -> ({i} / {vertex_cnt}) {v:?}");
             self.vertexes.push(v);
         }
         Ok(true)
     }
 
     fn parse_line_defs(&mut self, lump: &LumpData) -> Result<bool, String> {
+        let line_cnt = lump.bytes.len() / 14;
+        self.line_defs = Vec::with_capacity(line_cnt);
+        for i in 0..line_cnt {
+            let idx = i * 14;
+            let ld = LineDef {
+                v1_idx: buf_to_u16(&lump.bytes[idx + 0..=idx + 1]),
+                v2_idx: buf_to_u16(&lump.bytes[idx + 2..=idx + 3]),
+                flags: buf_to_u16(&lump.bytes[idx + 4..=idx + 5]),
+                action: buf_to_u16(&lump.bytes[idx + 6..=idx + 7]),
+                sect_tag: buf_to_u16(&lump.bytes[idx + 8..=idx + 9]),
+                front_side_idx: buf_to_u16(&lump.bytes[idx + 10..=idx + 11]),
+                back_side_idx: buf_to_u16(&lump.bytes[idx + 12..=idx + 13]),
+            };
+            //debug_println!("  -> ({i} / {line_cnt}) {ld:?}");
+            self.line_defs.push(ld);
+        }
+        Ok(true)
+    }
+
+    fn parse_things(&mut self, _lump: &LumpData) -> Result<bool, String> {
         // TODO implement this
         Ok(true)
     }
 
-    fn parse_things(&mut self, lump: &LumpData) -> Result<bool, String> {
+    fn parse_side_defs(&mut self, _lump: &LumpData) -> Result<bool, String> {
         // TODO implement this
         Ok(true)
     }
 
-    fn parse_side_defs(&mut self, lump: &LumpData) -> Result<bool, String> {
+    fn parse_segs(&mut self, _lump: &LumpData) -> Result<bool, String> {
         // TODO implement this
         Ok(true)
     }
 
-    fn parse_segs(&mut self, lump: &LumpData) -> Result<bool, String> {
+    fn parse_s_sectors(&mut self, _lump: &LumpData) -> Result<bool, String> {
         // TODO implement this
         Ok(true)
     }
 
-    fn parse_s_sectors(&mut self, lump: &LumpData) -> Result<bool, String> {
+    fn parse_nodes(&mut self, _lump: &LumpData) -> Result<bool, String> {
         // TODO implement this
         Ok(true)
     }
 
-    fn parse_nodes(&mut self, lump: &LumpData) -> Result<bool, String> {
+    fn parse_sectors(&mut self, _lump: &LumpData) -> Result<bool, String> {
         // TODO implement this
         Ok(true)
     }
 
-    fn parse_sectors(&mut self, lump: &LumpData) -> Result<bool, String> {
+    fn parse_reject(&mut self, _lump: &LumpData) -> Result<bool, String> {
         // TODO implement this
         Ok(true)
     }
 
-    fn parse_reject(&mut self, lump: &LumpData) -> Result<bool, String> {
-        // TODO implement this
-        Ok(true)
-    }
-
-    fn parse_blockmap(&mut self, lump: &LumpData) -> Result<bool, String> {
+    fn parse_blockmap(&mut self, _lump: &LumpData) -> Result<bool, String> {
         // TODO implement this
         Ok(true)
     }
