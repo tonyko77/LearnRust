@@ -1,16 +1,17 @@
 // Main DOOM game
 
-use crate::*;
 use crate::map::*;
 use crate::wad::*;
+use crate::*;
 use crate::{GraphicsLoop, Painter};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
 const DEFAULT_AUTOMAP_ZOOM_PERCENT: i32 = 10;
 const AUTOMAP_ZOOM_STEP: i32 = 1;
-const AUTOMAP_ZOOM_MIN: i32 = 3;
-const AUTOMAP_ZOOM_MAX: i32 = 30;
+const AUTOMAP_ZOOM_MIN: i32 = 5;
+const AUTOMAP_ZOOM_MAX: i32 = 50;
+const AUTOMAP_TRANSL_MULT: i32 = 10;
 
 // LineDef flags
 const LINE_BLOCKS: u16 = 0x0001;
@@ -29,9 +30,8 @@ pub struct DoomGame {
     scr_height: i32,
     _map_idx: usize,
     map: LevelMap,
-    automap_zoom: i32,
-    automap_offs_x: i32,
-    automap_offs_y: i32,
+    amap_zoom: i32,
+    amap_center: Vertex,
 }
 
 impl DoomGame {
@@ -42,9 +42,8 @@ impl DoomGame {
             scr_height,
             _map_idx: 0,
             map: LevelMap::default(),
-            automap_zoom: 0,
-            automap_offs_x: 0,
-            automap_offs_y: 0,
+            amap_zoom: 0,
+            amap_center: Vertex { x: 0, y: 0 },
         };
         game.load_map(0)?;
         Ok(game)
@@ -59,7 +58,8 @@ impl DoomGame {
         self._map_idx = idx;
         self.map = self.wad_data.get_map(idx)?;
         // compute automap zoom and offsets
-        self.automap_zoom = DEFAULT_AUTOMAP_ZOOM_PERCENT;
+        self.amap_zoom = DEFAULT_AUTOMAP_ZOOM_PERCENT;
+        self.amap_center = self.map.v_orig.clone();
         Ok(())
     }
 
@@ -71,7 +71,7 @@ impl DoomGame {
         // draw a rectangle around the automap
         let (x1, y1) = self.translate_automap_vertex(&self.map.v_min);
         let (x2, y2) = self.translate_automap_vertex(&self.map.v_max);
-        painter.draw_rect(x1, y1, x2-x1+1, y2-y1+1, DARK_GREY);
+        painter.draw_rect(x1, y1, x2 - x1 + 1, y2 - y1 + 1, DARK_GREY);
         // draw the automap
         for line in self.map.line_defs.iter() {
             let v1 = self.map.get_vertex(line.v1_idx);
@@ -97,51 +97,73 @@ impl DoomGame {
             };
             painter.draw_line(x1, y1, x2, y2, color);
         }
+        // draw the things
+        for thing in self.map.things.iter() {
+            let color = match thing.thing_type {
+                1 => YELLOW,
+                2 => ORANGE,
+                3 => BLUE,
+                4 => GREEN,
+                _ => DARK_GREY,
+            };
+            self.paint_cross(painter, &thing.pos, color);
+        }
+
+        // draw the player location
+        self.paint_cross(painter, &self.map.v_orig, WHITE);
+    }
+
+    fn paint_cross(&self, painter: &mut dyn Painter, v: &Vertex, color: RGB) {
+        let (x, y) = self.translate_automap_vertex(v);
+        painter.draw_line(x - 1, y, x + 1, y, color);
+        painter.draw_line(x, y - 1, x, y + 1, color);
     }
 
     #[inline]
     fn translate_automap_vertex(&self, orig_vertex: &Vertex) -> (i32, i32) {
-        // TODO variable translation + scaling !!
-        let x = ((orig_vertex.x - self.map.v_min.x) as i32) * self.automap_zoom / 100;
-        let yf = ((orig_vertex.y - self.map.v_min.y) as i32) * self.automap_zoom / 100;
-        let y = self.scr_height - yf - 1;
-        (x + self.automap_offs_x, y + self.automap_offs_y)
+        // scale the original coordinates
+        let xs = ((orig_vertex.x - self.amap_center.x) as i32) * self.amap_zoom / 100;
+        let ys = ((orig_vertex.y - self.amap_center.y) as i32) * self.amap_zoom / 100;
+        // translate the scaled coordinates + mirror y
+        let xt = xs + (self.scr_width / 2);
+        let yt = (self.scr_height / 2) - ys;
+        (xt, yt)
     }
 
     fn handle_key_down(&mut self, key: &Keycode) {
         match key {
             Keycode::KpPlus => {
-                if self.automap_zoom < AUTOMAP_ZOOM_MAX {
-                    self.automap_zoom += AUTOMAP_ZOOM_STEP;
+                if self.amap_zoom < AUTOMAP_ZOOM_MAX {
+                    self.amap_zoom += AUTOMAP_ZOOM_STEP;
                 }
-            },
+            }
             Keycode::KpMinus => {
-                if self.automap_zoom > AUTOMAP_ZOOM_MIN {
-                    self.automap_zoom -= AUTOMAP_ZOOM_STEP;
+                if self.amap_zoom > AUTOMAP_ZOOM_MIN {
+                    self.amap_zoom -= AUTOMAP_ZOOM_STEP;
                 }
-            },
+            }
             Keycode::Left => {
-                self.automap_offs_x += 10;
-            },
+                self.amap_center.x -= (self.amap_zoom * AUTOMAP_TRANSL_MULT).min(50) as i16;
+            }
             Keycode::Right => {
-                self.automap_offs_x -= 10;
-            },
+                self.amap_center.x += (self.amap_zoom * AUTOMAP_TRANSL_MULT).min(50) as i16;
+            }
             Keycode::Up => {
-                self.automap_offs_y += 10;
-            },
+                self.amap_center.y += (self.amap_zoom * AUTOMAP_TRANSL_MULT).min(50) as i16;
+            }
             Keycode::Down => {
-                self.automap_offs_y -= 10;
-            },
+                self.amap_center.y -= (self.amap_zoom * AUTOMAP_TRANSL_MULT).min(50) as i16;
+            }
             Keycode::PageUp => {
                 let cnt = self.get_map_count();
                 let idx = (self._map_idx + cnt - 1) % cnt;
                 self.load_map(idx).unwrap();
-            },
+            }
             Keycode::PageDown => {
                 let cnt = self.get_map_count();
                 let idx = (self._map_idx + 1) % cnt;
                 self.load_map(idx).unwrap();
-            },
+            }
             _ => {}
         }
     }
@@ -155,12 +177,16 @@ impl GraphicsLoop for DoomGame {
     fn handle_event(&mut self, event: &Event) -> bool {
         // check keys
         match event {
-            Event::KeyDown { keycode: Some(key), .. } => {
+            Event::KeyDown {
+                keycode: Some(key), ..
+            } => {
                 self.handle_key_down(key);
-            },
-            Event::KeyUp { keycode: Some(key), .. } => {
+            }
+            Event::KeyUp {
+                keycode: Some(key), ..
+            } => {
                 self.handle_key_up(key);
-            },
+            }
             _ => {}
         }
         true

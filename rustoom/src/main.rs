@@ -14,6 +14,7 @@ const PIXEL_SIZE: i32 = 2;
 
 const SLEEP_KIND: SleepKind = SleepKind::YIELD;
 
+//const WAD_PATH: &str = "s:\\DOOM_Quake\\IWADs\\HERETIC.WAD";
 const WAD_PATH: &str = "DOOM1.WAD";
 
 fn main() -> Result<(), String> {
