@@ -1,5 +1,6 @@
 // Main DOOM game
 
+use crate::gfxhandler::*;
 use crate::map::*;
 use crate::wad::*;
 use crate::*;
@@ -33,18 +34,22 @@ pub struct DoomGame {
     map: LevelMap,
     amap_zoom: i32,
     amap_center: Vertex,
+    gfxh: GraphicsHandler,
 }
 
 impl DoomGame {
     pub fn new(wad_data: WadData, scr_width: i32, scr_height: i32) -> Result<DoomGame, String> {
+        let rwd = Rc::from(wad_data);
+        let gfxh = GraphicsHandler::new(Rc::clone(&rwd))?;
         let mut game = DoomGame {
-            wad_data: Rc::from(wad_data),
+            wad_data: rwd,
             scr_width,
             scr_height,
             _map_idx: 0,
             map: LevelMap::default(),
             amap_zoom: 0,
             amap_center: Vertex { x: 0, y: 0 },
+            gfxh,
         };
         game.load_map(0)?;
         Ok(game)
