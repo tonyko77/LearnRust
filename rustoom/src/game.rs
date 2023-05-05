@@ -12,6 +12,17 @@ const AUTOMAP_ZOOM_STEP: i32 = 1;
 const AUTOMAP_ZOOM_MIN: i32 = 3;
 const AUTOMAP_ZOOM_MAX: i32 = 30;
 
+// LineDef flags
+const LINE_BLOCKS: u16 = 0x0001;
+//const LINE_BLOCKS_MONSTERS: u16 = 0x0002;
+const LINE_TWO_SIDED: u16 = 0x0004;
+//const LINE_UPPER_UNPEGGED: u16 = 0x0008;
+//const LINE_LOWER_UNPEGGED: u16 = 0x0010;
+const LINE_SECRET: u16 = 0x0020;
+//const LINE_BLOCKS_SND: u16 = 0x0040;
+//const LINE_NEVER_ON_AMAP: u16 = 0x0080;
+//const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
+
 pub struct DoomGame {
     wad_data: WadData,
     scr_width: i32,
@@ -56,8 +67,18 @@ impl DoomGame {
         for line in self.map.line_defs.iter() {
             let v1 = self.translate_automap_vertex(line.v1_idx);
             let v2 = self.translate_automap_vertex(line.v2_idx);
-            // TODO select color based on line type
-            let color = YELLOW;
+
+            // select color based on line type
+            let f = line.flags;
+            let color = if f & LINE_SECRET != 0 {
+                CYAN
+            } else if f & LINE_BLOCKS != 0 {
+                RED
+            } else if f & LINE_TWO_SIDED != 0 {
+                YELLOW
+            } else {
+                MAGENTA
+            };
             painter.draw_line(v1.0, v1.1, v2.0, v2.1, color);
         }
     }
