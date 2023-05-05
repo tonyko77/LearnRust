@@ -2,10 +2,10 @@
 
 use crate::utils::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Vertex {
-    x: i16,
-    y: i16,
+    pub x: i16,
+    pub y: i16,
 }
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ pub struct Thing {
 
 pub struct LevelMap {
     pub name: String,
-    pub vertexes: Vec<Vertex>,
+    vertexes: Vec<Vertex>,
     pub line_defs: Vec<LineDef>,
     pub things: Vec<Thing>,
     // TODO pub side_defs: Vec<SideDef>,
@@ -60,6 +60,11 @@ impl LevelMap {
         }
     }
 
+    #[inline]
+    pub fn get_vertex(&self, idx: u16) -> &Vertex {
+        &self.vertexes[idx as usize]
+    }
+    
     pub fn parse_vertexes(&mut self, lump_bytes: &[u8]) {
         let vertex_cnt = lump_bytes.len() >> 2;
         self.vertexes = Vec::with_capacity(vertex_cnt);
