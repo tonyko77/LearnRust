@@ -1,4 +1,4 @@
-//! Loads and manages a map from a wad
+//! Parse maps from the WAD.
 
 use crate::utils::*;
 
@@ -62,7 +62,7 @@ impl LevelMap {
     pub fn get_vertex(&self, idx: u16) -> &Vertex {
         &self.vertexes[idx as usize]
     }
-    
+
     pub fn parse_vertexes(&mut self, lump_bytes: &[u8]) {
         let vertex_cnt = lump_bytes.len() >> 2;
         self.vertexes = Vec::with_capacity(vertex_cnt);
@@ -76,8 +76,7 @@ impl LevelMap {
             if i == 0 {
                 self.v_min = v.clone();
                 self.v_max = v.clone();
-            }
-            else {
+            } else {
                 self.v_min.x = i16::min(self.v_min.x, v.x);
                 self.v_min.y = i16::min(self.v_min.y, v.y);
                 self.v_max.x = i16::max(self.v_max.x, v.x);

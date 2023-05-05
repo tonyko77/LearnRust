@@ -6,6 +6,7 @@ use crate::*;
 use crate::{GraphicsLoop, Painter};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use std::rc::Rc;
 
 const DEFAULT_AUTOMAP_ZOOM_PERCENT: i32 = 10;
 const AUTOMAP_ZOOM_STEP: i32 = 1;
@@ -25,7 +26,7 @@ const LINE_NEVER_ON_AMAP: u16 = 0x0080;
 const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
 pub struct DoomGame {
-    wad_data: WadData,
+    wad_data: Rc<WadData>,
     scr_width: i32,
     scr_height: i32,
     _map_idx: usize,
@@ -37,7 +38,7 @@ pub struct DoomGame {
 impl DoomGame {
     pub fn new(wad_data: WadData, scr_width: i32, scr_height: i32) -> Result<DoomGame, String> {
         let mut game = DoomGame {
-            wad_data: wad_data,
+            wad_data: Rc::from(wad_data),
             scr_width,
             scr_height,
             _map_idx: 0,
