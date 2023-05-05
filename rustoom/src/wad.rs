@@ -38,11 +38,7 @@ impl WadData {
             return Err(format!("WAD file {wad_path} is too small"));
         }
         // hdr[0..4] => "IWAD" or "PWAD"
-        let wad_kind_str = std::str::from_utf8(&wad_bytes[0..4]);
-        let wad_kind_str = match wad_kind_str {
-            Ok(kind) => String::from(kind),
-            Err(_) => String::from("cannot parse"),
-        };
+        let wad_kind_str = std::str::from_utf8(&wad_bytes[0..4]).map_err(|_|String::from("Invalid WAD header"))?;
         // hdr[4..8] = number of lumps / directory entries
         let lump_count = utils::buf_to_u32(&wad_bytes[4..8]) as usize;
         // hdr[8..12] = offset of directory entries
@@ -53,8 +49,8 @@ impl WadData {
             WadKind::IWAD => "IWAD",
             WadKind::PWAD => "PWAD",
         };
-        if expected_kind_str.ne(wad_kind_str.as_str()) {
-            return Err(format!("Invalid WAD type: {wad_kind_str}"));
+        if expected_kind_str.ne(wad_kind_str) {
+            return Err(format!("Invalid WAD type: expected {expected_kind_str}, was {wad_kind_str}"));
         }
 
         // build and validate the result
@@ -74,14 +70,14 @@ impl WadData {
         self.lump_count
     }
 
-    pub fn get_lump(&self, idx: usize) -> Result<LumpData, String> {
-        if idx >= self.lump_count {
+    pub fn get_lump(&self, lump_idx: usize) -> Result<LumpData, String> {
+        if lump_idx >= self.lump_count {
             Err(format!(
-                "Invalid lump index: {idx} >= count {} ",
+                "Invalid lump index: {lump_idx} >= count {} ",
                 self.lump_count
             ))
         } else {
-            let offs = self.dir_offset + 16 * idx;
+            let offs = self.dir_offset + 16 * lump_idx;
             let lump_start = utils::buf_to_u32(&self.wad_bytes[offs..(offs + 4)]) as usize;
             let lump_size = utils::buf_to_u32(&self.wad_bytes[(offs + 4)..(offs + 8)]) as usize;
             let wad_len = self.wad_bytes.len();
@@ -91,22 +87,11 @@ impl WadData {
                     "Lump too big: offs {lump_start} + size {lump_size} >= wad len {wad_len} "
                 ))
             } else {
-                let name_start = offs + 8;
-                let mut name_end = offs + 16;
-                // dismiss all null bytes at the end
-                while (name_end > name_start) && (0 == self.wad_bytes[name_end - 1]) {
-                    name_end -= 1;
-                }
-                let name_bytes = &self.wad_bytes[name_start..name_end];
-                let name_str = std::str::from_utf8(name_bytes);
-                match name_str {
-                    Ok(name) => Ok(LumpData {
-                        name,
-                        bytes: &self.wad_bytes[lump_start..lump_end],
-                    }),
-                    // this should not happen anyway - lump names should always be ASCII
-                    Err(_) => Err(format!("Invalid lump name at index {idx}")),
-                }
+                let name = utils::buf_to_lump_name(&self.wad_bytes[offs+8..offs+16])?;
+                Ok(LumpData {
+                    name,
+                    bytes: &self.wad_bytes[lump_start..lump_end],
+                })
             }
         }
     }
@@ -116,15 +101,15 @@ impl WadData {
         self.map_indices.len()
     }
 
-    pub fn get_map(&self, idx: usize) -> Result<LevelMap, String> {
-        if idx >= self.map_indices.len() {
+    pub fn get_map(&self, map_idx: usize) -> Result<LevelMap, String> {
+        if map_idx >= self.map_indices.len() {
             Err(format!(
-                "Invalid map index: {idx} >= count {} ",
+                "Invalid map index: {map_idx} >= count {} ",
                 self.map_indices.len()
             ))
         } else {
-            let mi = self.map_indices[idx];
-            self.build_map(mi)
+            let lump_idx = self.map_indices[map_idx];
+            self.build_map(lump_idx)
         }
     }
 
@@ -171,7 +156,10 @@ impl WadData {
                     map.parse_line_defs(&lump.bytes);
                     false
                 }
-                "THINGS" => false,   // TODO...
+                "THINGS" => {
+                    map.parse_things(&lump.bytes);
+                    false
+                }
                 "SIDEDEFS" => false, // TODO...
                 "SEGS" => false,     // TODO...
                 "SSECTORS" => false, // TODO...

@@ -1,9 +1,5 @@
 //! Loads and manages a map from a wad
 
-// TODO temporary !!!
-#![allow(dead_code)]
-#![allow(unused_variables)]
-
 use crate::utils::*;
 
 #[derive(Debug)]
@@ -14,27 +10,40 @@ pub struct Vertex {
 
 #[derive(Debug)]
 pub struct LineDef {
-    v1_idx: u16,
-    v2_idx: u16,
-    flags: u16,
-    line_type: u16,
-    sector_tag: u16,
-    right_side_def: u16,
-    left_side_def: u16,
+    pub v1_idx: u16,
+    pub v2_idx: u16,
+    pub flags: u16,
+    pub line_type: u16,
+    pub sector_tag: u16,
+    pub right_side_def: u16,
+    pub left_side_def: u16,
+}
+
+#[derive(Debug)]
+pub struct Thing {
+    pub x: i16,
+    pub y: i16,
+    pub angle: u16,
+    pub thing_type: u16,
+    pub flags: u16,
 }
 
 pub struct LevelMap {
     pub name: String,
-    vertexes: Vec<Vertex>,
-    line_defs: Vec<LineDef>,
-    // TODO things: Vec<Thing>,
-    // TODO side_defs: Vec<SideDef>,
-    // TODO segs: Vec<Segment>,
-    // TODO s_sectors: Vec<GLNode>,
-    // TODO nodes: Vec<Node>,
-    // TODO sectors: Vec<Sector>,
-    // TODO reject: Vec<Reject>,
-    // TODO blockmap: Vec<BlockMap>,
+    pub vertexes: Vec<Vertex>,
+    pub line_defs: Vec<LineDef>,
+    pub things: Vec<Thing>,
+    // TODO pub side_defs: Vec<SideDef>,
+    // TODO pub segs: Vec<Segment>,
+    // TODO pub s_sectors: Vec<GLNode>,
+    // TODO pub nodes: Vec<Node>,
+    // TODO pub sectors: Vec<Sector>,
+    // TODO pub reject: Vec<Reject>,
+    // TODO pub blockmap: Vec<BlockMap>,
+    pub x_min: i16,
+    pub x_max: i16,
+    pub y_min: i16,
+    pub y_max: i16,
 }
 
 impl LevelMap {
@@ -43,6 +52,11 @@ impl LevelMap {
             name: String::from(name),
             line_defs: vec![],
             vertexes: vec![],
+            things: vec![],
+            x_min: 0,
+            x_max: 0,
+            y_min: 0,
+            y_max: 0,
         }
     }
 
@@ -55,6 +69,19 @@ impl LevelMap {
                 x: buf_to_i16(&lump_bytes[idx + 0..=idx + 1]),
                 y: buf_to_i16(&lump_bytes[idx + 2..=idx + 3]),
             };
+            // also compute min/max for x & y
+            if i == 0 {
+                self.x_min = v.x;
+                self.x_max = v.x;
+                self.y_min = v.y;
+                self.y_max = v.y;
+            }
+            else {
+                self.x_min = i16::min(self.x_min, v.x);
+                self.x_max = i16::max(self.x_max, v.x);
+                self.y_min = i16::min(self.y_min, v.y);
+                self.y_max = i16::max(self.y_max, v.y);
+            }
             self.vertexes.push(v);
         }
     }
@@ -74,6 +101,22 @@ impl LevelMap {
                 left_side_def: buf_to_u16(&lump_bytes[idx + 12..=idx + 13]),
             };
             self.line_defs.push(ld);
+        }
+    }
+
+    pub fn parse_things(&mut self, lump_bytes: &[u8]) {
+        let thing_cnt = lump_bytes.len() / 10;
+        self.things = Vec::with_capacity(thing_cnt);
+        for i in 0..thing_cnt {
+            let idx = i * 10;
+            let th = Thing {
+                x: buf_to_i16(&lump_bytes[idx + 0..=idx + 1]),
+                y: buf_to_i16(&lump_bytes[idx + 2..=idx + 3]),
+                angle: buf_to_u16(&lump_bytes[idx + 4..=idx + 5]),
+                thing_type: buf_to_u16(&lump_bytes[idx + 6..=idx + 7]),
+                flags: buf_to_u16(&lump_bytes[idx + 8..=idx + 9]),
+            };
+            self.things.push(th);
         }
     }
 }
