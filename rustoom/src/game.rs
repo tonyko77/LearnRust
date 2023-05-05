@@ -20,8 +20,8 @@ const LINE_TWO_SIDED: u16 = 0x0004;
 //const LINE_LOWER_UNPEGGED: u16 = 0x0010;
 const LINE_SECRET: u16 = 0x0020;
 //const LINE_BLOCKS_SND: u16 = 0x0040;
-//const LINE_NEVER_ON_AMAP: u16 = 0x0080;
-//const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
+const LINE_NEVER_ON_AMAP: u16 = 0x0080;
+const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
 pub struct DoomGame {
     wad_data: WadData,
@@ -36,17 +36,18 @@ pub struct DoomGame {
 
 impl DoomGame {
     pub fn new(wad_data: WadData, scr_width: i32, scr_height: i32) -> Result<DoomGame, String> {
-        let first_map = wad_data.get_map(0)?;
-        Ok(DoomGame {
+        let mut game = DoomGame {
             wad_data: wad_data,
             scr_width,
             scr_height,
             _map_idx: 0,
-            map: first_map,
-            automap_zoom: DEFAULT_AUTOMAP_ZOOM_PERCENT,
-            automap_offs_x: 2,
-            automap_offs_y: -2,
-        })
+            map: LevelMap::default(),
+            automap_zoom: 0,
+            automap_offs_x: 0,
+            automap_offs_y: 0,
+        };
+        game.load_map(0)?;
+        Ok(game)
     }
 
     #[inline]
@@ -57,16 +58,26 @@ impl DoomGame {
     pub fn load_map(&mut self, idx: usize) -> Result<(), String> {
         self._map_idx = idx;
         self.map = self.wad_data.get_map(idx)?;
+        // compute automap zoom and offsets
+        self.automap_zoom = DEFAULT_AUTOMAP_ZOOM_PERCENT;
         Ok(())
     }
 
     //----------------
 
     fn paint_automap(&self, painter: &mut dyn Painter) {
+        // clear screen
         painter.fill_rect(0, 0, self.scr_width, self.scr_height, BLACK);
+        // draw a rectangle around the automap
+        let (x1, y1) = self.translate_automap_vertex(&self.map.v_min);
+        let (x2, y2) = self.translate_automap_vertex(&self.map.v_max);
+        painter.draw_rect(x1, y1, x2-x1+1, y2-y1+1, DARK_GREY);
+        // draw the automap
         for line in self.map.line_defs.iter() {
-            let v1 = self.translate_automap_vertex(line.v1_idx);
-            let v2 = self.translate_automap_vertex(line.v2_idx);
+            let v1 = self.map.get_vertex(line.v1_idx);
+            let v2 = self.map.get_vertex(line.v2_idx);
+            let (x1, y1) = self.translate_automap_vertex(v1);
+            let (x2, y2) = self.translate_automap_vertex(v2);
 
             // select color based on line type
             let f = line.flags;
@@ -75,20 +86,24 @@ impl DoomGame {
             } else if f & LINE_BLOCKS != 0 {
                 RED
             } else if f & LINE_TWO_SIDED != 0 {
-                YELLOW
+                // TODO: yellow for ceiling diff, choco for floor diff !!
+                CHOCO
+            } else if f & LINE_ALWAYS_ON_AMAP != 0 {
+                WHITE
+            } else if f & LINE_NEVER_ON_AMAP != 0 {
+                DARK_GREY
             } else {
                 MAGENTA
             };
-            painter.draw_line(v1.0, v1.1, v2.0, v2.1, color);
+            painter.draw_line(x1, y1, x2, y2, color);
         }
     }
 
     #[inline]
-    fn translate_automap_vertex(&self, vertex_idx: u16) -> (i32, i32) {
-        let orig_vertex = self.map.get_vertex(vertex_idx);
+    fn translate_automap_vertex(&self, orig_vertex: &Vertex) -> (i32, i32) {
         // TODO variable translation + scaling !!
-        let x = ((orig_vertex.x - self.map.x_min) as i32) * self.automap_zoom / 100;
-        let yf = ((orig_vertex.y - self.map.y_min) as i32) * self.automap_zoom / 100;
+        let x = ((orig_vertex.x - self.map.v_min.x) as i32) * self.automap_zoom / 100;
+        let yf = ((orig_vertex.y - self.map.v_min.y) as i32) * self.automap_zoom / 100;
         let y = self.scr_height - yf - 1;
         (x + self.automap_offs_x, y + self.automap_offs_y)
     }

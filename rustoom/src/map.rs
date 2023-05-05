@@ -2,7 +2,7 @@
 
 use crate::utils::*;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Vertex {
     pub x: i16,
     pub y: i16,
@@ -21,13 +21,13 @@ pub struct LineDef {
 
 #[derive(Debug)]
 pub struct Thing {
-    pub x: i16,
-    pub y: i16,
+    pub pos: Vertex,
     pub angle: u16,
     pub thing_type: u16,
     pub flags: u16,
 }
 
+#[derive(Default)]
 pub struct LevelMap {
     pub name: String,
     vertexes: Vec<Vertex>,
@@ -40,10 +40,9 @@ pub struct LevelMap {
     // TODO pub sectors: Vec<Sector>,
     // TODO pub reject: Vec<Reject>,
     // TODO pub blockmap: Vec<BlockMap>,
-    pub x_min: i16,
-    pub x_max: i16,
-    pub y_min: i16,
-    pub y_max: i16,
+    pub v_min: Vertex,
+    pub v_max: Vertex,
+    pub v_orig: Vertex,
 }
 
 impl LevelMap {
@@ -53,10 +52,9 @@ impl LevelMap {
             line_defs: vec![],
             vertexes: vec![],
             things: vec![],
-            x_min: 0,
-            x_max: 0,
-            y_min: 0,
-            y_max: 0,
+            v_min: Vertex { x: 0, y: 0 },
+            v_max: Vertex { x: 0, y: 0 },
+            v_orig: Vertex { x: 0, y: 0 },
         }
     }
 
@@ -76,16 +74,14 @@ impl LevelMap {
             };
             // also compute min/max for x & y
             if i == 0 {
-                self.x_min = v.x;
-                self.x_max = v.x;
-                self.y_min = v.y;
-                self.y_max = v.y;
+                self.v_min = v.clone();
+                self.v_max = v.clone();
             }
             else {
-                self.x_min = i16::min(self.x_min, v.x);
-                self.x_max = i16::max(self.x_max, v.x);
-                self.y_min = i16::min(self.y_min, v.y);
-                self.y_max = i16::max(self.y_max, v.y);
+                self.v_min.x = i16::min(self.v_min.x, v.x);
+                self.v_min.y = i16::min(self.v_min.y, v.y);
+                self.v_max.x = i16::max(self.v_max.x, v.x);
+                self.v_max.y = i16::max(self.v_max.y, v.y);
             }
             self.vertexes.push(v);
         }
@@ -115,12 +111,17 @@ impl LevelMap {
         for i in 0..thing_cnt {
             let idx = i * 10;
             let th = Thing {
-                x: buf_to_i16(&lump_bytes[idx + 0..=idx + 1]),
-                y: buf_to_i16(&lump_bytes[idx + 2..=idx + 3]),
+                pos: Vertex {
+                    x: buf_to_i16(&lump_bytes[idx + 0..=idx + 1]),
+                    y: buf_to_i16(&lump_bytes[idx + 2..=idx + 3]),
+                },
                 angle: buf_to_u16(&lump_bytes[idx + 4..=idx + 5]),
                 thing_type: buf_to_u16(&lump_bytes[idx + 6..=idx + 7]),
                 flags: buf_to_u16(&lump_bytes[idx + 8..=idx + 9]),
             };
+            if th.thing_type == 1 {
+                self.v_orig = th.pos.clone();
+            }
             self.things.push(th);
         }
     }
