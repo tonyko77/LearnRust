@@ -115,6 +115,10 @@ impl DoomGame {
             self.paint_cross(painter, &thing.pos, color);
         }
 
+        // TEMP draw some TEST text
+        let txt = "' \" !#$%^&*+_- :; ., <>()[] /|\\ (ABcdE) [0123456789] {fghijklmnopQrSTuvWxYz}";
+        self.gfxh.font.draw_text(3, 3, txt, ORANGE, painter);
+
         // draw the player location
         self.paint_cross(painter, &self.map.v_orig, WHITE);
     }

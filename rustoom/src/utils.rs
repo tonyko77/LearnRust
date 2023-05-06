@@ -1,4 +1,7 @@
-//  Various utilities
+//!  Various utilities
+
+//------------------------------
+//  Misc utility functions
 
 #[inline]
 pub fn buf_to_u16(buf: &[u8]) -> u16 {
@@ -47,4 +50,15 @@ pub fn hash_lump_name(name: &str) -> u64 {
         k = (k << 6) + ((b & 0x3F) as u64);
     }
     k
+}
+
+pub fn atoi(s: &str) -> Option<u32> {
+    let mut num = 0_u32;
+    for b in s.bytes() {
+        if b < ('0' as u8) || b > ('9' as u8) {
+            return None;
+        }
+        num = num * 10 + (b as u32) - ('0' as u32);
+    }
+    Some(num)
 }

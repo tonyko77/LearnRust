@@ -1,17 +1,23 @@
 //! Main lib for the RustooM Doom-like engine/demo
 
+mod font;
 mod game;
 mod gfxhandler;
 mod map;
 mod painter;
+mod palette;
+mod pixmap;
 mod sdl_wrapper;
 mod utils;
 mod wad;
 
+pub use font::*;
 pub use game::*;
 pub use gfxhandler::*;
 pub use map::*;
 pub use painter::*;
+pub use palette::*;
+pub use pixmap::*;
 pub use sdl_wrapper::*;
 pub use wad::*;
 
