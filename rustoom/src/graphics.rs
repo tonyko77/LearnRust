@@ -34,14 +34,14 @@ impl Graphics {
         self.flats.insert(key, lump_idx);
     }
 
-    pub fn get_patch(&self, name: &str) -> Option<PixMap> {
-        let key = hash_lump_name(name.as_bytes());
+    pub fn get_patch(&self, key: u64) -> Option<PixMap> {
         if let Some(idx) = self.patches.get(&key) {
             let lump = self.wad_data.get_lump(*idx);
             if let Ok(l) = lump {
                 return match PixMap::from_patch(l.bytes) {
                     Ok(pixmap) => Some(pixmap),
                     Err(err) => {
+                        let name = lump_name_from_hash(key);
                         println!("[ERROR] Failed to load patch {name}: {err}");
                         None
                     }
@@ -51,8 +51,7 @@ impl Graphics {
         None
     }
 
-    pub fn get_flat(&self, name: &str) -> Option<PixMap> {
-        let key = hash_lump_name(name.as_bytes());
+    pub fn get_flat(&self, key: u64) -> Option<PixMap> {
         if let Some(idx) = self.flats.get(&key) {
             let lump = self.wad_data.get_lump(*idx);
             if let Ok(l) = lump {

@@ -67,8 +67,7 @@ pub fn atoi(s: &str) -> Option<u32> {
 }
 
 // the opposite of hash_lump_name -> just in case we want the name
-// TODO is this needed ??
-pub fn _lum_name_from_hash(key: u64) -> String {
+pub fn lump_name_from_hash(key: u64) -> String {
     let mut bytes = Vec::with_capacity(8);
     let mut key = key;
     while key > 0 {
@@ -81,5 +80,6 @@ pub fn _lum_name_from_hash(key: u64) -> String {
         bytes.push(c);
         key = key >> 6;
     }
+    bytes.reverse();
     String::from_utf8(bytes).unwrap()
 }

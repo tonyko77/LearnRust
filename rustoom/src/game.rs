@@ -1,6 +1,14 @@
 // Main DOOM game
 
+/*
+TODO:
+    - improve the for-testing game loop:
+        - swap between: automap, display graphics / flats / sprites
+    - doc comments !!
+ */
+
 use crate::map::*;
+use crate::utils::{hash_lump_name, lump_name_from_hash};
 use crate::wad::*;
 use crate::*;
 use crate::{GraphicsLoop, Painter};
@@ -28,42 +36,59 @@ pub struct DoomGame {
     game: DoomGameData,
     scr_width: i32,
     scr_height: i32,
-    _map_idx: usize,
+    map_idx: usize,
     map: LevelMap,
     amap_zoom: i32,
     amap_center: Vertex,
+    _x_mode: i32,
+    _x_idx: usize,
+    _lump_names: Vec<String>,
+    _sprite_key: u64,
+    _sprite_gfx: PixMap,
 }
 
 impl DoomGame {
     pub fn new(wad: WadData, scr_width: i32, scr_height: i32) -> Result<DoomGame, String> {
+        // TEMP: collect lump names
+        let mut ln = Vec::with_capacity(wad.get_lump_count());
+        for i in 0..wad.get_lump_count() {
+            ln.push(String::from(wad.get_lump(i)?.name));
+        }
+
         let game = DoomGameData::build(wad)?;
         let mut engine = DoomGame {
             game,
             scr_width,
             scr_height,
-            _map_idx: 0,
+            _x_mode: 0,
+            _x_idx: 0,
+            map_idx: 9999,
             map: LevelMap::default(),
             amap_zoom: 0,
             amap_center: Vertex { x: 0, y: 0 },
+            _lump_names: ln,
+            _sprite_key: 0,
+            _sprite_gfx: PixMap::new_empty(),
         };
-        engine.load_map(0)?;
+        engine.update_state(0.0);
         Ok(engine)
     }
 
     pub fn load_map(&mut self, idx: usize) -> Result<(), String> {
-        self._map_idx = idx;
-        self.map = self.game.maps().get_map(idx)?;
-        // compute automap zoom and offsets
-        self.amap_zoom = DEFAULT_AUTOMAP_ZOOM_PERCENT;
-        self.amap_center = self.map.v_orig.clone();
+        let maps = self.game.maps();
+        if self.map_idx != idx && idx < maps.get_map_count() {
+            self.map_idx = idx;
+            self.map = maps.get_map(idx)?;
+            // compute automap zoom and offsets
+            self.amap_zoom = DEFAULT_AUTOMAP_ZOOM_PERCENT;
+            self.amap_center = self.map.v_orig.clone();
+        }
         Ok(())
     }
 
     //----------------
 
     fn paint_automap(&self, painter: &mut dyn Painter) {
-        // clear screen
-        painter.fill_rect(0, 0, self.scr_width, self.scr_height, BLACK);
         // draw a rectangle around the automap
         let (x1, y1) = self.translate_automap_vertex(&self.map.v_min);
         let (x2, y2) = self.translate_automap_vertex(&self.map.v_max);
@@ -113,6 +138,28 @@ impl DoomGame {
         self.game.font().draw_text(3, 3, &txt, ORANGE, painter);
     }
 
+    fn paint_graphics(&self, painter: &mut dyn Painter) {
+        // draw center lines
+        let xc = 160;
+        let yc = 160;
+        painter.draw_horiz_line(0, self.scr_width, yc, DARK_GREY);
+        painter.draw_vert_line(xc, 0, self.scr_height, DARK_GREY);
+        // draw sprite
+        self._sprite_gfx.paint(xc, yc, painter, self.game.palette());
+        // draw sprite name
+        let name = lump_name_from_hash(self._sprite_key);
+        let w = self._sprite_gfx.width();
+        let h = self._sprite_gfx.height();
+        let text = format!("{name} --> {w} x {h}");
+        self.game.font().draw_text(3, 3, &text, WHITE, painter);
+    }
+
+    fn paint_textures(&self, painter: &mut dyn Painter) {
+        self.game
+            .font()
+            .draw_text(3, 3, "TODO: PAINT TEXTURES !!!", YELLOW, painter);
+    }
+
     fn paint_cross(&self, painter: &mut dyn Painter, v: &Vertex, color: RGB) {
         let (x, y) = self.translate_automap_vertex(v);
         painter.draw_line(x - 1, y, x + 1, y, color);
@@ -155,14 +202,20 @@ impl DoomGame {
                 self.amap_center.y -= (self.amap_zoom * AUTOMAP_TRANSL_MULT).min(50) as i16;
             }
             Keycode::PageUp => {
-                let cnt = self.game.maps().get_map_count();
-                let idx = (self._map_idx + cnt - 1) % cnt;
-                self.load_map(idx).unwrap();
+                if self._x_idx > 0 {
+                    self._x_idx -= 1;
+                }
             }
             Keycode::PageDown => {
-                let cnt = self.game.maps().get_map_count();
-                let idx = (self._map_idx + 1) % cnt;
-                self.load_map(idx).unwrap();
+                if self._x_idx < usize::MAX {
+                    self._x_idx += 1;
+                }
+            }
+            Keycode::Home => {
+                self._x_idx = 0;
+            }
+            Keycode::End => {
+                self._x_mode = (self._x_mode + 1) % 3;
             }
             _ => {}
         }
@@ -189,10 +242,56 @@ impl GraphicsLoop for DoomGame {
     }
 
     fn update_state(&mut self, _elapsed_time: f64) -> bool {
+        // update map
+        match self._x_mode {
+            0 => {
+                let midx = self._x_idx % self.game.maps().get_map_count();
+                if let Err(msg) = self.load_map(midx) {
+                    println!("Error loading map {midx} => {msg}");
+                    return false;
+                }
+            }
+            1 => loop {
+                let nidx = self._x_idx % self._lump_names.len();
+                let name = &self._lump_names[nidx];
+                let key = hash_lump_name(name.as_bytes());
+                if let Some(gfx) = self.game.graphics().get_patch(key) {
+                    self._sprite_gfx = gfx;
+                    self._sprite_key = key;
+                    return true;
+                }
+                if let Some(gfx) = self.game.graphics().get_flat(key) {
+                    self._sprite_gfx = gfx;
+                    self._sprite_key = key;
+                    return true;
+                }
+                if self._x_idx == usize::MAX {
+                    self._x_mode = 0;
+                    return true;
+                }
+                self._x_idx += 1;
+            },
+            2 => {
+                // TODO: loop through textures
+            }
+            _ => {
+                println!("Invalid mode: {}", self._x_mode);
+            }
+        }
+
+        // update sprite
         true
     }
 
     fn paint(&self, painter: &mut dyn Painter) {
-        self.paint_automap(painter);
+        painter.fill_rect(0, 0, self.scr_width, self.scr_height, BLACK);
+        match self._x_mode {
+            0 => self.paint_automap(painter),
+            1 => self.paint_graphics(painter),
+            2 => self.paint_textures(painter),
+            _ => {
+                println!("Invalid mode: {}", self._x_mode);
+            }
+        }
     }
 }

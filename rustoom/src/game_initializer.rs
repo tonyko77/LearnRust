@@ -1,12 +1,5 @@
 //! Initialize the game data, by parsing the WAD contents.
 
-/*
-TODO:
-    - improve the for-testing game loop:
-        - swap between: automap, display graphics / flats / sprites
-    - doc comments !!
- */
-
 use crate::{
     utils::{buf_to_u16, buf_to_u32},
     Font, Graphics, MapManager, Palette, TextureSet, WadData,
@@ -175,8 +168,9 @@ fn quick_check_if_lump_is_graphic(bytes: &[u8]) -> bool {
 
     // check that, for each column, its offset fits in the patch
     let mut max_idx = 0;
-    let width = buf_to_u16(bytes) as usize;
-    if len < (8 + 4 * width) {
+    let width = buf_to_u16(&bytes[0..=1]) as usize;
+    let height = buf_to_u16(&bytes[2..=3]) as usize;
+    if width == 0 || height == 0 || len < (8 + 4 * width) {
         return false;
     }
     for col in 0..width {
