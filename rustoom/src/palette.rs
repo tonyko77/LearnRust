@@ -2,10 +2,11 @@
 
 use crate::ColorMapper;
 use crate::RGB;
+use bytes::Bytes;
 
 pub struct Palette {
-    colormaps: Vec<u8>,
-    palletes: Vec<u8>,
+    colormaps: Bytes,
+    palletes: Bytes,
     cmap_cnt: usize,
     cmap_selection: usize,
     pal_cnt: usize,
@@ -15,8 +16,8 @@ pub struct Palette {
 impl Palette {
     pub fn new() -> Self {
         Palette {
-            colormaps: vec![],
-            palletes: vec![],
+            colormaps: Bytes::new(),
+            palletes: Bytes::new(),
             cmap_cnt: 0,
             cmap_selection: 0,
             pal_cnt: 0,
@@ -24,16 +25,16 @@ impl Palette {
         }
     }
 
-    pub fn init_palettes(&mut self, bytes: &[u8]) {
-        self.palletes = bytes.to_vec();
-        self.pal_selection = 0;
+    pub fn init_palettes(&mut self, bytes: Bytes) {
         self.pal_cnt = bytes.len() / 768;
+        self.palletes = bytes;
+        self.pal_selection = 0;
     }
 
-    pub fn init_colormaps(&mut self, bytes: &[u8]) {
-        self.colormaps = bytes.to_vec();
-        self.cmap_selection = 0;
+    pub fn init_colormaps(&mut self, bytes: Bytes) {
         self.cmap_cnt = bytes.len() / 256;
+        self.colormaps = bytes;
+        self.cmap_selection = 0;
     }
 
     #[inline]
@@ -57,10 +58,7 @@ impl Palette {
 
     pub fn select_colormap(&mut self, cmap: usize) -> Result<(), String> {
         if cmap >= self.cmap_cnt {
-            Err(format!(
-                "Invalid colormap index: {cmap} >= {}",
-                self.cmap_cnt
-            ))
+            Err(format!("Invalid colormap index: {cmap} >= {}", self.cmap_cnt))
         } else {
             self.cmap_selection = cmap * 256;
             Ok(())

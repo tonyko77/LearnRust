@@ -34,7 +34,7 @@ impl MapManager {
         // parse map lumps
         for i in (lump_idx + 1)..(lump_idx + 13) {
             let lump = self.wad.get_lump(i)?;
-            let must_break = match lump.name {
+            let must_break = match lump.name.as_str() {
                 "VERTEXES" => {
                     map.parse_vertexes(&lump.bytes);
                     false

@@ -48,9 +48,9 @@ pub struct LevelMap {
 }
 
 impl LevelMap {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: String) -> Self {
         LevelMap {
-            name: String::from(name),
+            name,
             line_defs: vec![],
             vertexes: vec![],
             things: vec![],

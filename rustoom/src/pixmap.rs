@@ -1,5 +1,7 @@
 //! Pixel Maps (Patches, Flats, Fonts)
 
+// TODO !!! store bytes directly instead of loading + add a type enum + decode upon paint !!!
+
 use crate::utils::*;
 use crate::*;
 
@@ -96,11 +98,7 @@ impl PixMap {
                 // parse the post bytes
                 let len = patch_bytes.get(col_ofs + 1).cloned().unwrap_or(0) as usize;
                 for y in 0..len {
-                    column_pixels[y + y_ofs] = patch_bytes
-                        .get(col_ofs + 3 + y)
-                        .cloned()
-                        .unwrap_or(PINK_PIXEL)
-                        as i32;
+                    column_pixels[y + y_ofs] = patch_bytes.get(col_ofs + 3 + y).cloned().unwrap_or(PINK_PIXEL) as i32;
                 }
                 // advance to the next post
                 col_ofs += len + 4;
@@ -124,10 +122,7 @@ impl PixMap {
 
     pub fn convert_to_font(&mut self, mapper: &dyn ColorMapper) {
         let size = (self.width as usize) * (self.height as usize);
-        if self.pixels.len() <= size
-            || self.left_offs == FLAT_MARKER
-            || self.left_offs == FONT_MARKER
-        {
+        if self.pixels.len() <= size || self.left_offs == FLAT_MARKER || self.left_offs == FONT_MARKER {
             // nothing to do
             return;
         }
@@ -140,8 +135,7 @@ impl PixMap {
             if self.pixels[transp_idx] & transp_bit == 0 {
                 let code = self.pixels[idx];
                 let rgb = mapper.byte2rgb(code);
-                let gray =
-                    ((rgb.r as u32) * 299 + (rgb.g as u32) * 587 + (rgb.b as u32) * 114) / 1000;
+                let gray = ((rgb.r as u32) * 299 + (rgb.g as u32) * 587 + (rgb.b as u32) * 114) / 1000;
                 if max_level < gray {
                     max_level = gray;
                 }

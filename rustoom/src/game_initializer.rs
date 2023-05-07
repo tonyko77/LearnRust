@@ -2,6 +2,7 @@
 
 use crate::utils::*;
 use crate::*;
+use bytes::Bytes;
 use std::rc::Rc;
 
 pub struct DoomGameData {
@@ -18,7 +19,7 @@ impl DoomGameData {
         let pal = Palette::new();
         let maps = MapManager::new(&wad);
         let font = Font::new();
-        let gfx = Graphics::new(&wad);
+        let gfx = Graphics::new();
 
         let mut dgd = DoomGameData {
             wad,
@@ -57,51 +58,47 @@ impl DoomGameData {
 
     fn parse_wad_lumps(&mut self) -> Result<(), String> {
         let mut is_flats = false;
-        let mut pnames_idx = usize::MAX;
-        let mut textures_idx = vec![];
+        let mut pnames = Bytes::new();
+        let mut textures = vec![];
 
         // parse each lump
         for lump_idx in 0..self.wad.get_lump_count() {
-            let l = self.wad.get_lump(lump_idx)?;
-            let has_bytes = l.bytes.len() > 0;
+            let lump = self.wad.get_lump(lump_idx)?;
+            let has_bytes = lump.bytes.len() > 0;
 
-            if !is_valid_lump_name(l.name) {
-                return Err(format!("Invalid lump name at index {lump_idx}"));
-            }
-
-            match l.name {
-                "PLAYPAL" => self.pal.init_palettes(l.bytes),
-                "COLORMAP" => self.pal.init_colormaps(l.bytes),
-                "PNAMES" => pnames_idx = lump_idx,
+            match lump.name.as_str() {
+                "PLAYPAL" => self.pal.init_palettes(lump.bytes),
+                "COLORMAP" => self.pal.init_colormaps(lump.bytes),
+                "PNAMES" => pnames = lump.bytes.clone(),
                 "F_START" => is_flats = true,
                 "F_END" => is_flats = false,
-                _ => {}
-            }
-
-            if is_texture_name(l.name) {
-                textures_idx.push(lump_idx);
-            } else if is_map_name(l.name) {
-                self.maps.add_map(lump_idx);
-            } else if has_bytes && is_flats {
-                self.gfx.add_flat(l.name, lump_idx);
-            } else if quick_check_if_lump_is_graphic(l.bytes) {
-                self.gfx.add_patch(l.name, lump_idx);
-                if is_font_name(l.name) {
-                    self.font.add_font_lump(l.name, l.bytes, &self.pal)?;
+                _ => {
+                    if is_texture_name(&lump.name) {
+                        textures.push(lump.bytes);
+                    } else if is_map_name(&lump.name) {
+                        self.maps.add_map(lump_idx);
+                    } else if has_bytes && is_flats {
+                        self.gfx.add_flat(&lump.name, lump.bytes.clone());
+                    } else if quick_check_if_lump_is_graphic(&lump.bytes) {
+                        self.gfx.add_patch(&lump.name, lump.bytes.clone());
+                        if is_font_name(&lump.name) {
+                            self.font.add_font_lump(&lump.name, lump.bytes.clone(), &self.pal)?;
+                        }
+                    }
                 }
             }
         }
 
         // set up textures
-        if pnames_idx == usize::MAX {
+        if pnames.is_empty() {
             return Err("PNAMES lump not found in WAD".to_string());
         }
-        if textures_idx.is_empty() {
+        if textures.is_empty() {
             return Err("TEXTUREx lump(s) not found in WAD".to_string());
         }
-        self.gfx.set_patch_names(self.wad.get_lump(pnames_idx)?.bytes)?;
-        for ti in textures_idx {
-            self.gfx.add_textures(self.wad.get_lump(ti)?.bytes)?;
+        self.gfx.set_patch_names(&pnames)?;
+        for tex_bytes in textures {
+            self.gfx.add_textures(&tex_bytes)?;
         }
 
         Ok(())
@@ -124,11 +121,6 @@ impl DoomGameData {
 
 //-----------------------------
 //  Internal utils
-
-#[inline]
-fn is_valid_lump_name(name: &str) -> bool {
-    name.bytes().all(|b| b > 32 && b < 127)
-}
 
 #[inline]
 fn is_map_name(name: &str) -> bool {

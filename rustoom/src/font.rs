@@ -3,6 +3,7 @@
 use crate::pixmap::*;
 use crate::utils::*;
 use crate::*;
+use bytes::Bytes;
 
 pub struct Font {
     font: Vec<PixMap>,
@@ -19,7 +20,7 @@ impl Font {
         }
     }
 
-    pub fn add_font_lump(&mut self, name: &str, bytes: &[u8], mapper: &dyn ColorMapper) -> Result<(), String> {
+    pub fn add_font_lump(&mut self, name: &str, bytes: Bytes, mapper: &dyn ColorMapper) -> Result<(), String> {
         if name.len() > 6 {
             // extract the code from the lump name
             let code = match &name[0..5] {

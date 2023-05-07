@@ -4,14 +4,13 @@
 #![allow(dead_code)]
 
 use crate::utils::*;
-use crate::wad::*;
 use crate::*;
-use std::{collections::HashMap, rc::Rc};
+use bytes::Bytes;
+use std::collections::HashMap;
 
 pub struct Graphics {
-    wad_data: Rc<WadData>,
-    patches: HashMap<u64, usize>,
-    flats: HashMap<u64, usize>,
+    patches: HashMap<u64, Bytes>,
+    flats: HashMap<u64, Bytes>,
     patch_map: Vec<u64>,
     textures: HashMap<u64, Texture>,
     // TODO delete these later
@@ -21,9 +20,8 @@ pub struct Graphics {
 }
 
 impl Graphics {
-    pub fn new(wad: &Rc<WadData>) -> Self {
+    pub fn new() -> Self {
         Graphics {
-            wad_data: Rc::clone(wad),
             patches: HashMap::new(),
             flats: HashMap::new(),
             patch_map: vec![],
@@ -46,15 +44,15 @@ impl Graphics {
         &self.dbg_tex_keys
     }
 
-    pub fn add_patch(&mut self, name: &str, lump_idx: usize) {
+    pub fn add_patch(&mut self, name: &str, lump: Bytes) {
         let key = hash_lump_name(name.as_bytes());
-        self.patches.insert(key, lump_idx);
+        self.patches.insert(key, lump);
         self.dbg_patch_keys.push(key); // TODO TEMP !!!
     }
 
-    pub fn add_flat(&mut self, name: &str, lump_idx: usize) {
+    pub fn add_flat(&mut self, name: &str, lump: Bytes) {
         let key = hash_lump_name(name.as_bytes());
-        self.flats.insert(key, lump_idx);
+        self.flats.insert(key, lump);
         self.dbg_flat_keys.push(key); // TODO TEMP !!!
     }
 
@@ -130,28 +128,22 @@ impl Graphics {
     }
 
     pub fn get_patch(&self, key: u64) -> Option<PixMap> {
-        if let Some(idx) = self.patches.get(&key) {
-            let lump = self.wad_data.get_lump(*idx);
-            if let Ok(l) = lump {
-                return match PixMap::from_patch(l.bytes) {
-                    Ok(pixmap) => Some(pixmap),
-                    Err(err) => {
-                        let name = lump_name_from_hash(key);
-                        println!("[ERROR] Failed to load patch {name}: {err}");
-                        None
-                    }
-                };
-            }
+        if let Some(bytes) = self.patches.get(&key) {
+            return match PixMap::from_patch(bytes) {
+                Ok(pixmap) => Some(pixmap),
+                Err(err) => {
+                    let name = lump_name_from_hash(key);
+                    println!("[ERROR] Failed to load patch {name}: {err}");
+                    None
+                }
+            };
         }
         None
     }
 
     pub fn get_flat(&self, key: u64) -> Option<PixMap> {
-        if let Some(idx) = self.flats.get(&key) {
-            let lump = self.wad_data.get_lump(*idx);
-            if let Ok(l) = lump {
-                return Some(PixMap::from_flat(l.bytes));
-            }
+        if let Some(bytes) = self.flats.get(&key) {
+            return Some(PixMap::from_flat(&bytes));
         }
         None
     }
