@@ -1,13 +1,11 @@
 // Main DOOM game
 
-use crate::gfxhandler::*;
 use crate::map::*;
 use crate::wad::*;
 use crate::*;
 use crate::{GraphicsLoop, Painter};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use std::rc::Rc;
 
 const DEFAULT_AUTOMAP_ZOOM_PERCENT: i32 = 10;
 const AUTOMAP_ZOOM_STEP: i32 = 1;
@@ -27,42 +25,34 @@ const LINE_NEVER_ON_AMAP: u16 = 0x0080;
 const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
 pub struct DoomGame {
-    wad_data: Rc<WadData>,
+    game: DoomGameData,
     scr_width: i32,
     scr_height: i32,
     _map_idx: usize,
     map: LevelMap,
     amap_zoom: i32,
     amap_center: Vertex,
-    gfxh: GraphicsHandler,
 }
 
 impl DoomGame {
-    pub fn new(wad_data: WadData, scr_width: i32, scr_height: i32) -> Result<DoomGame, String> {
-        let rwd = Rc::from(wad_data);
-        let gfxh = GraphicsHandler::new(Rc::clone(&rwd))?;
-        let mut game = DoomGame {
-            wad_data: rwd,
+    pub fn new(wad: WadData, scr_width: i32, scr_height: i32) -> Result<DoomGame, String> {
+        let game = DoomGameData::build(wad)?;
+        let mut engine = DoomGame {
+            game,
             scr_width,
             scr_height,
             _map_idx: 0,
             map: LevelMap::default(),
             amap_zoom: 0,
             amap_center: Vertex { x: 0, y: 0 },
-            gfxh,
         };
-        game.load_map(0)?;
-        Ok(game)
-    }
-
-    #[inline]
-    pub fn get_map_count(&self) -> usize {
-        self.wad_data.get_map_count()
+        engine.load_map(0)?;
+        Ok(engine)
     }
 
     pub fn load_map(&mut self, idx: usize) -> Result<(), String> {
         self._map_idx = idx;
-        self.map = self.wad_data.get_map(idx)?;
+        self.map = self.game.maps().get_map(idx)?;
         // compute automap zoom and offsets
         self.amap_zoom = DEFAULT_AUTOMAP_ZOOM_PERCENT;
         self.amap_center = self.map.v_orig.clone();
@@ -115,12 +105,12 @@ impl DoomGame {
             self.paint_cross(painter, &thing.pos, color);
         }
 
-        // TEMP draw some TEST text
-        let txt = "' \" !#$%^&*+_- :; ., <>()[] /|\\ (ABcdE) [0123456789] {fghijklmnopQrSTuvWxYz}";
-        self.gfxh.font.draw_text(3, 3, txt, ORANGE, painter);
-
         // draw the player location
         self.paint_cross(painter, &self.map.v_orig, WHITE);
+
+        // draw map name
+        let txt = format!("Map: {}", self.map.name);
+        self.game.font().draw_text(3, 3, &txt, ORANGE, painter);
     }
 
     fn paint_cross(&self, painter: &mut dyn Painter, v: &Vertex, color: RGB) {
@@ -165,12 +155,12 @@ impl DoomGame {
                 self.amap_center.y -= (self.amap_zoom * AUTOMAP_TRANSL_MULT).min(50) as i16;
             }
             Keycode::PageUp => {
-                let cnt = self.get_map_count();
+                let cnt = self.game.maps().get_map_count();
                 let idx = (self._map_idx + cnt - 1) % cnt;
                 self.load_map(idx).unwrap();
             }
             Keycode::PageDown => {
-                let cnt = self.get_map_count();
+                let cnt = self.game.maps().get_map_count();
                 let idx = (self._map_idx + 1) % cnt;
                 self.load_map(idx).unwrap();
             }
@@ -187,14 +177,10 @@ impl GraphicsLoop for DoomGame {
     fn handle_event(&mut self, event: &Event) -> bool {
         // check keys
         match event {
-            Event::KeyDown {
-                keycode: Some(key), ..
-            } => {
+            Event::KeyDown { keycode: Some(key), .. } => {
                 self.handle_key_down(key);
             }
-            Event::KeyUp {
-                keycode: Some(key), ..
-            } => {
+            Event::KeyUp { keycode: Some(key), .. } => {
                 self.handle_key_up(key);
             }
             _ => {}

@@ -1,4 +1,4 @@
-//! Parse maps from the WAD.
+//! Parse and build maps from the WAD.
 
 use crate::utils::*;
 
@@ -26,6 +26,8 @@ pub struct Thing {
     pub thing_type: u16,
     pub flags: u16,
 }
+
+//---------------------------
 
 #[derive(Default)]
 pub struct LevelMap {

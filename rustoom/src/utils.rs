@@ -44,12 +44,15 @@ pub fn buf_to_lump_name<'a>(buf: &'a [u8]) -> Result<&'a str, String> {
 /// Since lumps should only use digits, upper case letters and a few simbols
 /// => they fall into the range 32-95 (0x20-0x5F)
 /// => it is safe to pick only the lower 6 bits of each ASCII character (byte).
-pub fn hash_lump_name(name: &str) -> u64 {
-    let mut k = 0_u64;
-    for b in name.bytes() {
-        k = (k << 6) + ((b & 0x3F) as u64);
+pub fn hash_lump_name(name: &[u8]) -> u64 {
+    let mut key = 0_u64;
+    for b in name {
+        if *b == 0 {
+            break;
+        }
+        key = (key << 6) + ((*b & 0x3F) as u64);
     }
-    k
+    key
 }
 
 pub fn atoi(s: &str) -> Option<u32> {
