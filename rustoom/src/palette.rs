@@ -38,13 +38,8 @@ impl Palette {
     }
 
     #[inline]
-    pub fn is_palette_initialized(&self) -> bool {
-        self.pal_cnt > 0
-    }
-
-    #[inline]
-    pub fn is_colormap_initialized(&self) -> bool {
-        self.cmap_cnt > 0
+    pub fn is_initialized(&self) -> bool {
+        self.pal_cnt > 0 && self.cmap_cnt > 0
     }
 
     pub fn select_palette(&mut self, pal: usize) -> Result<(), String> {

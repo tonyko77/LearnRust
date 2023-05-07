@@ -11,30 +11,6 @@ pub enum WadKind {
     PWAD,
 }
 
-pub struct LumpData {
-    pub name: String,
-    pub bytes: Bytes,
-}
-
-impl LumpData {
-    fn new(name_bytes: &[u8], bytes: Bytes, idx: usize) -> Result<Self, String> {
-        // dismiss all null bytes at the name's end
-        let mut idx_end = 0;
-        for ch in name_bytes {
-            if *ch == 0 {
-                break;
-            } else if *ch <= 32 || *ch >= 127 {
-                return Err(format!("Invalid lump name at index {idx}"));
-            } else {
-                idx_end += 1;
-            }
-        }
-        // all ok
-        let name = std::str::from_utf8(&name_bytes[0..idx_end]).unwrap().to_string();
-        Ok(LumpData { name, bytes })
-    }
-}
-
 /// Stores all the bytes from a WAD file.
 /// Also provides raw access to the WAD directory and lumps.
 /// See [DIYDoom, Notes001](https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes001/notes).
@@ -110,5 +86,31 @@ impl WadData {
                 LumpData::new(name_bytes, bytes, lump_idx)
             }
         }
+    }
+}
+
+//-------------------------
+
+pub struct LumpData {
+    pub name: String,
+    pub bytes: Bytes,
+}
+
+impl LumpData {
+    fn new(name_bytes: &[u8], bytes: Bytes, idx: usize) -> Result<Self, String> {
+        // dismiss all null bytes at the name's end
+        let mut idx_end = 0;
+        for ch in name_bytes {
+            if *ch == 0 {
+                break;
+            } else if *ch <= 32 || *ch >= 127 {
+                return Err(format!("Invalid lump name at index {idx}"));
+            } else {
+                idx_end += 1;
+            }
+        }
+        // all ok
+        let name = std::str::from_utf8(&name_bytes[0..idx_end]).unwrap().to_string();
+        Ok(LumpData { name, bytes })
     }
 }

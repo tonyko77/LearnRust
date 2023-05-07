@@ -2,7 +2,19 @@
 
 /*
 TODO:
+    - move all DEMO code separately (bottom part of this source file is OK)
+    - use Bytes in: Map/MapManager, PixMap etc:
+        * in PixMap:
+            - keep raw Bytes + a type flag (enum)
+            - decode on paint :) (should be easy)
+        * in MapManager:
+            - store the Bytes for each lump !!
+            - some lumps don't really require extraction => just keep them as they are
+        * in textures:
+            - keep PNAMES directly as bytes! => no extra mem
+            - maybe even TEXTURES as bytes (+ maybe some indexes, for each texture)
     - move automap code to separate module
+    - add BSP code
     - doc comments !!
  */
 
@@ -41,19 +53,12 @@ pub struct DoomGame {
     amap_center: Vertex,
     _x_mode: i32,
     _x_idx: usize,
-    _lump_names: Vec<String>,
     _sprite_key: u64,
     _sprite_gfx: PixMap,
 }
 
 impl DoomGame {
     pub fn new(wad: WadData, scr_width: i32, scr_height: i32) -> Result<DoomGame, String> {
-        // TEMP: collect lump names
-        let mut ln = Vec::with_capacity(wad.get_lump_count());
-        for i in 0..wad.get_lump_count() {
-            ln.push(String::from(wad.get_lump(i)?.name));
-        }
-
         let game = DoomGameData::build(wad)?;
         let mut engine = DoomGame {
             game,
@@ -65,7 +70,6 @@ impl DoomGame {
             map: LevelMap::default(),
             amap_zoom: 0,
             amap_center: Vertex { x: 0, y: 0 },
-            _lump_names: ln,
             _sprite_key: 0,
             _sprite_gfx: PixMap::new_empty(),
         };

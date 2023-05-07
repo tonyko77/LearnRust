@@ -3,10 +3,9 @@
 use crate::utils::*;
 use crate::*;
 use bytes::Bytes;
-use std::rc::Rc;
 
 pub struct DoomGameData {
-    wad: Rc<WadData>,
+    wad: WadData,
     pal: Palette,
     maps: MapManager,
     font: Font,
@@ -15,9 +14,9 @@ pub struct DoomGameData {
 
 impl DoomGameData {
     pub fn build(wad_data: WadData) -> Result<DoomGameData, String> {
-        let wad = Rc::from(wad_data);
+        let wad = wad_data;
         let pal = Palette::new();
-        let maps = MapManager::new(&wad);
+        let maps = MapManager::new();
         let font = Font::new();
         let gfx = Graphics::new();
 
@@ -76,7 +75,7 @@ impl DoomGameData {
                     if is_texture_name(&lump.name) {
                         textures.push(lump.bytes);
                     } else if is_map_name(&lump.name) {
-                        self.maps.add_map(lump_idx);
+                        self.maps.add_map(lump.name, lump_idx, &self.wad)?;
                     } else if has_bytes && is_flats {
                         self.gfx.add_flat(&lump.name, lump.bytes.clone());
                     } else if quick_check_if_lump_is_graphic(&lump.bytes) {
@@ -105,10 +104,8 @@ impl DoomGameData {
     }
 
     fn validate_collected_data(&self) -> Result<(), String> {
-        if !self.pal.is_palette_initialized() {
-            Err(String::from("Pallete lump not found in WAD"))
-        } else if !self.pal.is_colormap_initialized() {
-            Err(String::from("Colormap lump not found in WAD"))
+        if !self.pal.is_initialized() {
+            Err(String::from("PLAYPAL or COLORMAP lump not found in WAD"))
         } else if self.maps.get_map_count() == 0 {
             Err(String::from("Maps not found in WAD"))
         } else if !self.font.is_complete() {
