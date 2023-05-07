@@ -2,14 +2,15 @@
 
 /*
 TODO:
-    - implement THIS initializer
-    - refactor/finish GFX handler + RENAME it !!!
     - improve the for-testing game loop:
         - swap between: automap, display graphics / flats / sprites
     - doc comments !!
  */
 
-use crate::{Font, Graphics, MapManager, Palette, Textures, WadData};
+use crate::{
+    utils::{buf_to_u16, buf_to_u32},
+    Font, Graphics, MapManager, Palette, TextureSet, WadData,
+};
 use std::rc::Rc;
 
 pub struct DoomGameData {
@@ -18,7 +19,7 @@ pub struct DoomGameData {
     maps: MapManager,
     font: Font,
     gfx: Graphics, // TODO rename - to Graphics? GfxHolder??
-    textures: Textures,
+    textures: TextureSet,
 }
 
 impl DoomGameData {
@@ -28,7 +29,7 @@ impl DoomGameData {
         let maps = MapManager::new(&wad);
         let font = Font::new();
         let gfx = Graphics::new(&wad);
-        let textures = Textures::new();
+        let textures = TextureSet::new();
 
         let mut dgd = DoomGameData {
             wad,
@@ -66,7 +67,7 @@ impl DoomGameData {
     }
 
     #[inline]
-    pub fn textures(&self) -> &Textures {
+    pub fn textures(&self) -> &TextureSet {
         &self.textures
     }
 
@@ -167,6 +168,40 @@ fn is_ascii_digit(byte: u8) -> bool {
 }
 
 fn quick_check_if_lump_is_graphic(bytes: &[u8]) -> bool {
-    // TODO implement this !!!
-    true
+    let len = bytes.len();
+    if len < 12 {
+        return false;
+    }
+
+    // check that, for each column, its offset fits in the patch
+    let mut max_idx = 0;
+    let width = buf_to_u16(bytes) as usize;
+    if len < (8 + 4 * width) {
+        return false;
+    }
+    for col in 0..width {
+        let col_ofs = buf_to_u32(&bytes[8 + 4 * col..]) as usize;
+        max_idx = max_idx.max(col_ofs);
+        if len <= max_idx {
+            return false;
+        }
+    }
+
+    // check the column with the maximum offset
+    loop {
+        // if we went past the end of the lump bytes => NOT ok
+        if max_idx >= len {
+            return false;
+        }
+        // if we reached the end of column safely => we're ok
+        if bytes[max_idx] == 0xFF {
+            return true;
+        }
+        // skip the post
+        if (max_idx + 3) >= len {
+            return false;
+        }
+        let post_len = bytes[max_idx + 1] as usize;
+        max_idx += post_len + 4;
+    }
 }

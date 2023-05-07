@@ -3,7 +3,7 @@
 mod font;
 mod game;
 mod game_initializer;
-mod gfxhandler;
+mod graphics;
 mod map;
 mod map_manager;
 mod painter;
@@ -17,7 +17,7 @@ mod wad;
 pub use font::*;
 pub use game::*;
 pub use game_initializer::*;
-pub use gfxhandler::*;
+pub use graphics::*;
 pub use map::*;
 pub use map_manager::*;
 pub use painter::*;
