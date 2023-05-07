@@ -10,7 +10,6 @@ mod painter;
 mod palette;
 mod pixmap;
 mod sdl_wrapper;
-mod texture;
 mod utils;
 mod wad;
 
@@ -24,7 +23,6 @@ pub use painter::*;
 pub use palette::*;
 pub use pixmap::*;
 pub use sdl_wrapper::*;
-pub use texture::*;
 pub use wad::*;
 
 // TODO clean up unused colors (+ move them in another mod ?)

@@ -2,13 +2,12 @@
 
 /*
 TODO:
-    - improve the for-testing game loop:
-        - swap between: automap, display graphics / flats / sprites
+    - move automap code to separate module
     - doc comments !!
  */
 
 use crate::map::*;
-use crate::utils::{hash_lump_name, lump_name_from_hash};
+use crate::utils::lump_name_from_hash;
 use crate::wad::*;
 use crate::*;
 use crate::{GraphicsLoop, Painter};
@@ -138,7 +137,7 @@ impl DoomGame {
         self.game.font().draw_text(3, 3, &txt, ORANGE, painter);
     }
 
-    fn paint_graphics(&self, painter: &mut dyn Painter) {
+    fn paint_graphics(&self, painter: &mut dyn Painter, hdr: &str, color: RGB) {
         // draw center lines
         let xc = 160;
         let yc = 160;
@@ -150,14 +149,8 @@ impl DoomGame {
         let name = lump_name_from_hash(self._sprite_key);
         let w = self._sprite_gfx.width();
         let h = self._sprite_gfx.height();
-        let text = format!("{name} --> {w} x {h}");
-        self.game.font().draw_text(3, 3, &text, WHITE, painter);
-    }
-
-    fn paint_textures(&self, painter: &mut dyn Painter) {
-        self.game
-            .font()
-            .draw_text(3, 3, "TODO: PAINT TEXTURES !!!", YELLOW, painter);
+        let text = format!("{hdr}: {name} --> {w} x {h}");
+        self.game.font().draw_text(3, 3, &text, color, painter);
     }
 
     fn paint_cross(&self, painter: &mut dyn Painter, v: &Vertex, color: RGB) {
@@ -215,7 +208,8 @@ impl DoomGame {
                 self._x_idx = 0;
             }
             Keycode::End => {
-                self._x_mode = (self._x_mode + 1) % 3;
+                self._x_mode = (self._x_mode + 1) & 0x03;
+                self._x_idx = 0;
             }
             _ => {}
         }
@@ -251,31 +245,29 @@ impl GraphicsLoop for DoomGame {
                     return false;
                 }
             }
-            1 => loop {
-                let nidx = self._x_idx % self._lump_names.len();
-                let name = &self._lump_names[nidx];
-                let key = hash_lump_name(name.as_bytes());
-                if let Some(gfx) = self.game.graphics().get_patch(key) {
-                    self._sprite_gfx = gfx;
-                    self._sprite_key = key;
-                    return true;
-                }
-                if let Some(gfx) = self.game.graphics().get_flat(key) {
-                    self._sprite_gfx = gfx;
-                    self._sprite_key = key;
-                    return true;
-                }
-                if self._x_idx == usize::MAX {
-                    self._x_mode = 0;
-                    return true;
-                }
-                self._x_idx += 1;
-            },
+            1 => {
+                let keys = self.game.graphics().dbg_patch_keys();
+                let kidx = self._x_idx % keys.len();
+                let k = keys[kidx];
+                self._sprite_gfx = self.game.graphics().get_patch(k).unwrap();
+                self._sprite_key = k;
+            }
             2 => {
-                // TODO: loop through textures
+                let keys = self.game.graphics().dbg_flat_keys();
+                let kidx = self._x_idx % keys.len();
+                let k = keys[kidx];
+                self._sprite_gfx = self.game.graphics().get_flat(k).unwrap();
+                self._sprite_key = k;
+            }
+            3 => {
+                let keys = self.game.graphics().dbg_texture_keys();
+                let kidx = self._x_idx % keys.len();
+                let k = keys[kidx];
+                self._sprite_gfx = self.game.graphics().get_texture(k).unwrap();
+                self._sprite_key = k;
             }
             _ => {
-                println!("Invalid mode: {}", self._x_mode);
+                self._x_mode = 0;
             }
         }
 
@@ -286,12 +278,10 @@ impl GraphicsLoop for DoomGame {
     fn paint(&self, painter: &mut dyn Painter) {
         painter.fill_rect(0, 0, self.scr_width, self.scr_height, BLACK);
         match self._x_mode {
-            0 => self.paint_automap(painter),
-            1 => self.paint_graphics(painter),
-            2 => self.paint_textures(painter),
-            _ => {
-                println!("Invalid mode: {}", self._x_mode);
-            }
+            1 => self.paint_graphics(painter, "PATCH", YELLOW),
+            2 => self.paint_graphics(painter, "FLAT", CYAN),
+            3 => self.paint_graphics(painter, "TEXTURE", WHITE),
+            _ => self.paint_automap(painter),
         }
     }
 }
