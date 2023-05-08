@@ -26,13 +26,7 @@ pub struct SdlConfiguration {
 }
 
 impl SdlConfiguration {
-    pub fn new(
-        title: &str,
-        scr_width: i32,
-        scr_height: i32,
-        pixel_size: i32,
-        sleep_kind: SleepKind,
-    ) -> Self {
+    pub fn new(title: &str, scr_width: i32, scr_height: i32, pixel_size: i32, sleep_kind: SleepKind) -> Self {
         assert!(scr_width > 0);
         assert!(scr_height > 0);
         assert!(pixel_size > 0);
@@ -169,6 +163,14 @@ struct InternalTexturePainter<'a> {
 }
 
 impl<'a> Painter for InternalTexturePainter<'a> {
+    fn get_screen_width(&self) -> i32 {
+        self.scr_width
+    }
+
+    fn get_screen_height(&self) -> i32 {
+        self.scr_height
+    }
+
     fn draw_pixel(&mut self, x: i32, y: i32, color: RGB) {
         if x >= 0 && y >= 0 && x < self.scr_width && y < self.scr_height {
             let offset = (y as usize) * self.pitch + (x as usize) * 3;
@@ -207,11 +209,7 @@ impl FpsAndElapsedCounter {
         self.time_cnt += 1;
         if self.time_sum >= 1.0 {
             let avg = self.time_sum / (self.time_cnt as f64);
-            self.fps = if avg <= 0.0 {
-                999999
-            } else {
-                (1.0 / avg) as u32
-            };
+            self.fps = if avg <= 0.0 { 999999 } else { (1.0 / avg) as u32 };
             self.time_cnt = 0;
             self.time_sum = 0.0;
         }

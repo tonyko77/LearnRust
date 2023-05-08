@@ -1,129 +1,237 @@
 //! Parse and build maps from the WAD.
 
 use crate::utils::*;
+use crate::*;
+use bytes::Bytes;
 
-#[derive(Debug, Clone, Default)]
+const IDX_THINGS: usize = 0;
+const IDX_LINEDEFS: usize = 1;
+const IDX_SIDEDEFS: usize = 2;
+const IDX_VERTEXES: usize = 3;
+const IDX_SEGS: usize = 4;
+const IDX_SSECTORS: usize = 5;
+const IDX_NODES: usize = 6;
+const IDX_SECTORS: usize = 7;
+const IDX_REJECT: usize = 8;
+const IDX_BLOCKMAP: usize = 9;
+const LUMP_CNT: usize = 10;
+
+// LineDef flags
+const LINE_BLOCKS: u16 = 0x0001;
+//const LINE_BLOCKS_MONSTERS: u16 = 0x0002;
+const LINE_TWO_SIDED: u16 = 0x0004;
+//const LINE_UPPER_UNPEGGED: u16 = 0x0008;
+//const LINE_LOWER_UNPEGGED: u16 = 0x0010;
+const LINE_SECRET: u16 = 0x0020;
+//const LINE_BLOCKS_SND: u16 = 0x0040;
+const LINE_NEVER_ON_AMAP: u16 = 0x0080;
+const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
+
+const DEFAULT_AUTOMAP_ZOOM_PERCENT: i32 = 10;
+const AUTOMAP_ZOOM_MIN: i32 = 5;
+const AUTOMAP_ZOOM_MAX: i32 = 50;
+
+// TODO use i32 !!?
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Vertex {
     pub x: i16,
     pub y: i16,
 }
 
-#[derive(Debug)]
-pub struct LineDef {
-    pub v1_idx: u16,
-    pub v2_idx: u16,
-    pub flags: u16,
-    pub line_type: u16,
-    pub sector_tag: u16,
-    pub right_side_def: u16,
-    pub left_side_def: u16,
+pub struct MapData {
+    name: String,
+    lumps: Box<[Bytes; LUMP_CNT]>,
+    amap_zoom: i32,
+    amap_center: Vertex,
 }
 
-#[derive(Debug)]
-pub struct Thing {
-    pub pos: Vertex,
-    pub angle: u16,
-    pub thing_type: u16,
-    pub flags: u16,
+impl Clone for MapData {
+    fn clone(&self) -> Self {
+        let lumps: Box<[Bytes; LUMP_CNT]> = Box::new((*self.lumps).clone());
+        Self {
+            name: self.name.clone(),
+            lumps,
+            amap_zoom: self.amap_zoom,
+            amap_center: self.amap_center.clone(),
+        }
+    }
 }
 
-//---------------------------
+impl MapData {
+    pub fn new(name: &str) -> Self {
+        let lumps: Box<[Bytes; LUMP_CNT]> = Box::new(Default::default());
+        Self {
+            name: name.to_string(),
+            lumps,
+            amap_zoom: DEFAULT_AUTOMAP_ZOOM_PERCENT,
+            amap_center: Vertex { x: 0, y: 0 },
+        }
+    }
 
-#[derive(Default)]
-pub struct LevelMap {
-    pub name: String,
-    vertexes: Vec<Vertex>,
-    pub line_defs: Vec<LineDef>,
-    pub things: Vec<Thing>,
-    // TODO pub side_defs: Vec<SideDef>,
-    // TODO pub segs: Vec<Segment>,
-    // TODO pub s_sectors: Vec<GLNode>,
-    // TODO pub nodes: Vec<Node>,
-    // TODO pub sectors: Vec<Sector>,
-    // TODO pub reject: Vec<Reject>,
-    // TODO pub blockmap: Vec<BlockMap>,
-    pub v_min: Vertex,
-    pub v_max: Vertex,
-    pub v_orig: Vertex,
-}
-
-impl LevelMap {
-    pub fn new(name: String) -> Self {
-        LevelMap {
-            name,
-            line_defs: vec![],
-            vertexes: vec![],
-            things: vec![],
-            v_min: Vertex { x: 0, y: 0 },
-            v_max: Vertex { x: 0, y: 0 },
-            v_orig: Vertex { x: 0, y: 0 },
+    pub fn add_lump(&mut self, lump: &str, bytes: Bytes) -> bool {
+        let idx = match lump {
+            "VERTEXES" => IDX_VERTEXES,
+            "LINEDEFS" => IDX_LINEDEFS,
+            "THINGS" => IDX_THINGS,
+            "SIDEDEFS" => IDX_SIDEDEFS,
+            "SEGS" => IDX_SEGS,
+            "SSECTORS" => IDX_SSECTORS,
+            "NODES" => IDX_NODES,
+            "SECTORS" => IDX_SECTORS,
+            "REJECT" => IDX_REJECT,
+            "BLOCKMAP" => IDX_BLOCKMAP,
+            _ => usize::MAX,
+        };
+        if idx < LUMP_CNT {
+            self.lumps[idx] = bytes;
+            true
+        } else {
+            false
         }
     }
 
     #[inline]
-    pub fn get_vertex(&self, idx: u16) -> &Vertex {
-        &self.vertexes[idx as usize]
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
-    pub fn parse_vertexes(&mut self, lump_bytes: &[u8]) {
-        let vertex_cnt = lump_bytes.len() >> 2;
-        self.vertexes = Vec::with_capacity(vertex_cnt);
-        for i in 0..vertex_cnt {
-            let idx = i << 2;
-            let v = Vertex {
-                x: buf_to_i16(&lump_bytes[idx + 0..=idx + 1]),
-                y: buf_to_i16(&lump_bytes[idx + 2..=idx + 3]),
-            };
-            // also compute min/max for x & y
-            if i == 0 {
-                self.v_min = v.clone();
-                self.v_max = v.clone();
+    #[inline]
+    pub fn is_complete(&self) -> bool {
+        self.lumps.iter().all(|b| b.len() > 0)
+    }
+
+    pub fn move_automap(&mut self, dx: i16, dy: i16) {
+        self.amap_center.x += dx;
+        self.amap_center.y += dy;
+    }
+
+    pub fn zoom_automap(&mut self, dzoom: i32) {
+        let new_zoom = self.amap_zoom + dzoom;
+        self.amap_zoom = new_zoom.max(AUTOMAP_ZOOM_MIN).min(AUTOMAP_ZOOM_MAX);
+    }
+
+    pub fn paint_automap(&self, painter: &mut dyn Painter, font: &Font) {
+        for idx in 0..self.line_count() {
+            let line = self.linedef(idx);
+            let (x1, y1) = self.translate_automap_vertex(line.v1, painter);
+            let (x2, y2) = self.translate_automap_vertex(line.v2, painter);
+
+            // select color based on line type
+            let f = line.flags;
+            let color = if f & LINE_SECRET != 0 {
+                CYAN
+            } else if f & LINE_BLOCKS != 0 {
+                RED
+            } else if f & LINE_TWO_SIDED != 0 {
+                // TODO: yellow for ceiling diff, choco for floor diff !!
+                CHOCO
+            } else if f & LINE_ALWAYS_ON_AMAP != 0 {
+                WHITE
+            } else if f & LINE_NEVER_ON_AMAP != 0 {
+                DARK_GREY
             } else {
-                self.v_min.x = i16::min(self.v_min.x, v.x);
-                self.v_min.y = i16::min(self.v_min.y, v.y);
-                self.v_max.x = i16::max(self.v_max.x, v.x);
-                self.v_max.y = i16::max(self.v_max.y, v.y);
-            }
-            self.vertexes.push(v);
+                MAGENTA
+            };
+            painter.draw_line(x1, y1, x2, y2, color);
+        }
+        // draw the things
+        for idx in 0..self.thing_count() {
+            let thing = self.thing(idx);
+            let color = match thing.thing_type {
+                1 => WHITE,
+                2 => ORANGE,
+                3 => BLUE,
+                4 => GREEN,
+                _ => DARK_GREY,
+            };
+            self.paint_cross(painter, thing.pos, color);
+        }
+
+        // draw map name
+        let txt = format!("Map: {}", self.name);
+        font.draw_text(3, 3, &txt, ORANGE, painter);
+    }
+
+    fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> (i32, i32) {
+        // scale the original coordinates
+        let xs = ((orig_vertex.x - self.amap_center.x) as i32) * self.amap_zoom / 100;
+        let ys = ((orig_vertex.y - self.amap_center.y) as i32) * self.amap_zoom / 100;
+        // translate the scaled coordinates + mirror y
+        let xt = xs + (painter.get_screen_width() / 2);
+        let yt = (painter.get_screen_height() / 2) - ys;
+        (xt, yt)
+    }
+
+    fn paint_cross(&self, painter: &mut dyn Painter, v: Vertex, color: RGB) {
+        let (x, y) = self.translate_automap_vertex(v, painter);
+        painter.draw_line(x - 1, y, x + 1, y, color);
+        painter.draw_line(x, y - 1, x, y + 1, color);
+    }
+
+    fn vertex(&self, idx: usize) -> Vertex {
+        let i = idx << 2;
+        let bytes = self.lumps[IDX_VERTEXES].as_ref();
+        Vertex {
+            x: buf_to_i16(&bytes[(i + 0)..(i + 2)]),
+            y: buf_to_i16(&bytes[(i + 2)..(i + 4)]),
         }
     }
 
-    pub fn parse_line_defs(&mut self, lump_bytes: &[u8]) {
-        let line_cnt = lump_bytes.len() / 14;
-        self.line_defs = Vec::with_capacity(line_cnt);
-        for i in 0..line_cnt {
-            let idx = i * 14;
-            let ld = LineDef {
-                v1_idx: buf_to_u16(&lump_bytes[idx + 0..=idx + 1]),
-                v2_idx: buf_to_u16(&lump_bytes[idx + 2..=idx + 3]),
-                flags: buf_to_u16(&lump_bytes[idx + 4..=idx + 5]),
-                line_type: buf_to_u16(&lump_bytes[idx + 6..=idx + 7]),
-                sector_tag: buf_to_u16(&lump_bytes[idx + 8..=idx + 9]),
-                right_side_def: buf_to_u16(&lump_bytes[idx + 10..=idx + 11]),
-                left_side_def: buf_to_u16(&lump_bytes[idx + 12..=idx + 13]),
-            };
-            self.line_defs.push(ld);
+    #[inline]
+    fn line_count(&self) -> usize {
+        self.lumps[IDX_LINEDEFS].len() / 14
+    }
+
+    fn linedef(&self, idx: usize) -> LineDef {
+        let i = idx * 14;
+        let bytes = self.lumps[IDX_LINEDEFS].as_ref();
+        let vi1 = buf_to_u16(&bytes[(i + 0)..(i + 2)]);
+        let vi2 = buf_to_u16(&bytes[(i + 2)..(i + 4)]);
+        LineDef {
+            v1: self.vertex(vi1 as usize),
+            v2: self.vertex(vi2 as usize),
+            flags: buf_to_u16(&bytes[(i + 4)..(i + 6)]),
+            _line_type: buf_to_u16(&bytes[(i + 6)..(i + 8)]),
+            _sector_tag: buf_to_u16(&bytes[(i + 8)..(i + 10)]),
+            _right_side_def: buf_to_u16(&bytes[(i + 10)..(i + 12)]),
+            _left_side_def: buf_to_u16(&bytes[(i + 12)..(i + 14)]),
         }
     }
 
-    pub fn parse_things(&mut self, lump_bytes: &[u8]) {
-        let thing_cnt = lump_bytes.len() / 10;
-        self.things = Vec::with_capacity(thing_cnt);
-        for i in 0..thing_cnt {
-            let idx = i * 10;
-            let th = Thing {
-                pos: Vertex {
-                    x: buf_to_i16(&lump_bytes[idx + 0..=idx + 1]),
-                    y: buf_to_i16(&lump_bytes[idx + 2..=idx + 3]),
-                },
-                angle: buf_to_u16(&lump_bytes[idx + 4..=idx + 5]),
-                thing_type: buf_to_u16(&lump_bytes[idx + 6..=idx + 7]),
-                flags: buf_to_u16(&lump_bytes[idx + 8..=idx + 9]),
-            };
-            if th.thing_type == 1 {
-                self.v_orig = th.pos.clone();
-            }
-            self.things.push(th);
+    #[inline]
+    fn thing_count(&self) -> usize {
+        self.lumps[IDX_THINGS].len() / 10
+    }
+
+    fn thing(&self, idx: usize) -> Thing {
+        let i = idx * 10;
+        let bytes = self.lumps[IDX_THINGS].as_ref();
+        Thing {
+            pos: Vertex {
+                x: buf_to_i16(&bytes[(i + 0)..(i + 2)]),
+                y: buf_to_i16(&bytes[(i + 2)..(i + 4)]),
+            },
+            _angle: buf_to_u16(&bytes[(i + 4)..(i + 6)]),
+            thing_type: buf_to_u16(&bytes[(i + 6)..(i + 8)]),
+            _flags: buf_to_u16(&bytes[(i + 8)..(i + 10)]),
         }
     }
+}
+
+struct LineDef {
+    pub v1: Vertex,
+    pub v2: Vertex,
+    pub flags: u16,
+    pub _line_type: u16,
+    pub _sector_tag: u16,
+    pub _right_side_def: u16,
+    pub _left_side_def: u16,
+}
+
+#[derive(Debug)]
+struct Thing {
+    pub pos: Vertex,
+    pub _angle: u16,
+    pub thing_type: u16,
+    pub _flags: u16,
 }

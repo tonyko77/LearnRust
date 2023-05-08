@@ -7,7 +7,7 @@ use bytes::Bytes;
 pub struct DoomGameData {
     wad: WadData,
     pal: Palette,
-    maps: MapManager,
+    maps: Vec<MapData>,
     font: Font,
     gfx: Graphics,
 }
@@ -16,14 +16,13 @@ impl DoomGameData {
     pub fn build(wad_data: WadData) -> Result<DoomGameData, String> {
         let wad = wad_data;
         let pal = Palette::new();
-        let maps = MapManager::new();
         let font = Font::new();
         let gfx = Graphics::new();
 
         let mut dgd = DoomGameData {
             wad,
             pal,
-            maps,
+            maps: vec![],
             font,
             gfx,
         };
@@ -39,8 +38,13 @@ impl DoomGameData {
     }
 
     #[inline]
-    pub fn maps(&self) -> &MapManager {
-        &self.maps
+    pub fn map_count(&self) -> usize {
+        self.maps.len()
+    }
+
+    #[inline]
+    pub fn map(&self, idx: usize) -> &MapData {
+        &self.maps[idx]
     }
 
     #[inline]
@@ -59,11 +63,33 @@ impl DoomGameData {
         let mut is_flats = false;
         let mut pnames = Bytes::new();
         let mut textures = vec![];
+        let mut parsing_map: Option<MapData> = None;
 
         // parse each lump
         for lump_idx in 0..self.wad.get_lump_count() {
             let lump = self.wad.get_lump(lump_idx)?;
             let has_bytes = lump.bytes.len() > 0;
+
+            // parse map lumps
+            if parsing_map.is_some() {
+                let mut map = parsing_map.unwrap();
+                let still_parsing = map.add_lump(&lump.name, lump.bytes.clone());
+                if still_parsing {
+                    parsing_map = Some(map);
+                    continue;
+                }
+                // finished parsing one map
+                parsing_map = None;
+                if !map.is_complete() {
+                    return Err(format!("Incomplete map in WAD: {}", map.name()));
+                }
+                self.maps.push(map);
+            }
+            if is_map_name(&lump.name) {
+                // starting to parse new map
+                parsing_map = Some(MapData::new(&lump.name));
+                continue;
+            }
 
             match lump.name.as_str() {
                 "PLAYPAL" => self.pal.init_palettes(lump.bytes),
@@ -74,8 +100,6 @@ impl DoomGameData {
                 _ => {
                     if is_texture_name(&lump.name) {
                         textures.push(lump.bytes);
-                    } else if is_map_name(&lump.name) {
-                        self.maps.add_map(lump.name, lump_idx, &self.wad)?;
                     } else if has_bytes && is_flats {
                         self.gfx.add_flat(&lump.name, lump.bytes.clone());
                     } else if quick_check_if_lump_is_graphic(&lump.bytes) {
@@ -109,7 +133,7 @@ impl DoomGameData {
     fn validate_collected_data(&self) -> Result<(), String> {
         if !self.pal.is_initialized() {
             Err(String::from("PLAYPAL or COLORMAP lump not found in WAD"))
-        } else if self.maps.get_map_count() == 0 {
+        } else if self.maps.len() == 0 {
             Err(String::from("Maps not found in WAD"))
         } else if !self.font.is_complete() {
             Err(String::from("Fonts not found in WAD"))
@@ -157,6 +181,7 @@ fn is_ascii_digit(byte: u8) -> bool {
     byte >= ('0' as u8) && byte <= ('9' as u8)
 }
 
+// TODO improve check, to make sure nothing goes out of bounds ?!?
 fn quick_check_if_lump_is_graphic(bytes: &[u8]) -> bool {
     let len = bytes.len();
     if len < 12 {

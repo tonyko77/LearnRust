@@ -17,6 +17,10 @@ impl RGB {
 /// Painter interface, to be passed to client code so it can perform painting.
 /// *This is not meant to be implemented by client code.*
 pub trait Painter {
+    fn get_screen_width(&self) -> i32;
+
+    fn get_screen_height(&self) -> i32;
+
     /// Draw a single pixel.
     /// This is the only abstract method. The others are based on this one.
     fn draw_pixel(&mut self, x: i32, y: i32, color: RGB);

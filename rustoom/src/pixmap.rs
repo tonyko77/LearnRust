@@ -52,11 +52,6 @@ impl PixMap {
     }
 
     pub fn from_patch(patch_bytes: Bytes) -> Self {
-        // // TODO validate patch data DURING WAD loading!
-        // if patch_bytes.len() <= 12 {
-        //     return Err(ERR_BAD_PATCH.to_string());
-        // }
-
         let width = buf_to_u16(&patch_bytes[0..=1]);
         let height = buf_to_u16(&patch_bytes[2..=3]);
         Self {
@@ -93,8 +88,8 @@ impl PixMap {
     }
 
     fn paint_pink(&self, x: i32, y: i32, painter: &mut dyn Painter) {
-        for dy in 0 .. self.height as i32 {
-            for dx in 0 .. self.width as i32 {
+        for dy in 0..self.height as i32 {
+            for dx in 0..self.width as i32 {
                 painter.draw_pixel(x + dx, y + dy, RGB::from(255, 0, 255));
             }
         }
@@ -102,8 +97,8 @@ impl PixMap {
 
     fn paint_flat(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
         let mut idx = 0;
-        for dy in 0 .. self.height as i32 {
-            for dx in 0 .. self.width as i32 {
+        for dy in 0..self.height as i32 {
+            for dx in 0..self.width as i32 {
                 let pixcode = self.data[idx];
                 idx += 1;
                 let color = mapper.byte2rgb(pixcode);
@@ -119,9 +114,9 @@ impl PixMap {
         let y0 = buf_to_i16(&self.data[6..8]) as i32;
 
         let mut ofs_idx = 8;
-        for dx in 0 .. self.width as i32 {
+        for dx in 0..self.width as i32 {
             // find the column index
-            let mut col_idx = buf_to_u32(&self.data[ofs_idx .. ofs_idx + 4]) as usize;
+            let mut col_idx = buf_to_u32(&self.data[ofs_idx..ofs_idx + 4]) as usize;
             ofs_idx += 4;
             loop {
                 let dy = self.data[col_idx] as i32;
@@ -129,7 +124,7 @@ impl PixMap {
                     break;
                 }
                 let len = self.data[col_idx + 1] as i32;
-                for i in 0 .. len {
+                for i in 0..len {
                     let pixcode = self.data[col_idx + 3 + (i as usize)];
                     let color = mapper.byte2rgb(pixcode);
                     painter.draw_pixel(x + dx - x0, y + dy + i - y0, color);
@@ -138,7 +133,12 @@ impl PixMap {
             }
         }
     }
+}
 
+impl Default for PixMap {
+    fn default() -> Self {
+        Self::new_empty()
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
