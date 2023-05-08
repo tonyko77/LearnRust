@@ -2,7 +2,6 @@
 
 /*
 TODO:
-    - move all DEMO code separately (bottom part of this source file is OK)
     - use Bytes in: Map/MapManager, PixMap etc:
         * in PixMap:
             - keep raw Bytes + a type flag (enum)
@@ -14,6 +13,7 @@ TODO:
             - keep PNAMES directly as bytes! => no extra mem
             - maybe even TEXTURES as bytes (+ maybe some indexes, for each texture)
     - move automap code to separate module
+        - then: move all DEMO code separately (bottom part of this source file is OK)
     - add BSP code
     - doc comments !!
  */

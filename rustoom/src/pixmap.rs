@@ -4,13 +4,7 @@
 
 use crate::utils::*;
 use crate::*;
-
-const FLAT_MARKER: i16 = i16::MIN;
-const FONT_MARKER: i16 = i16::MAX;
-const ERR_BAD_PATCH: &str = "Invalid patch data in WAD";
-
-// TODO: 251 for DOOM, 175 for HERETIC => should be detected from the PLAYPAL
-const PINK_PIXEL: u8 = 251;
+use bytes::Bytes;
 
 /// Trait which provides color mapping at runtime (u8 -> RGB).
 pub trait ColorMapper {
@@ -24,180 +18,52 @@ pub trait ColorMapper {
 pub struct PixMap {
     width: u16,
     height: u16,
-    left_offs: i16,
-    top_offs: i16,
-    pixels: Vec<u8>,
+    kind: PixMapKind,
+    data: Bytes,
 }
 
 impl PixMap {
     pub fn new_empty() -> Self {
-        PixMap {
+        Self {
             width: 0,
             height: 0,
-            left_offs: 0,
-            top_offs: 0,
-            pixels: vec![],
+            kind: PixMapKind::PlaceHolder,
+            data: Bytes::new(),
         }
     }
 
     pub fn new_placeholder(width: usize, height: usize) -> Self {
-        let size = width * height;
-        PixMap {
+        Self {
             width: width as u16,
             height: height as u16,
-            left_offs: FLAT_MARKER,
-            top_offs: 0,
-            pixels: vec![PINK_PIXEL; size],
+            kind: PixMapKind::PlaceHolder,
+            data: Bytes::new(),
         }
     }
 
-    pub fn from_flat(flat_bytes: &[u8]) -> Self {
-        let h = (flat_bytes.len() >> 6) as u16;
-        PixMap {
+    pub fn from_flat(flat_bytes: Bytes) -> Self {
+        let height = (flat_bytes.len() >> 6) as u16;
+        Self {
             width: 64,
-            height: h,
-            left_offs: FLAT_MARKER,
-            top_offs: 0,
-            pixels: flat_bytes.to_vec(),
+            height,
+            kind: PixMapKind::Flat,
+            data: flat_bytes,
         }
     }
 
-    pub fn from_patch(patch_bytes: &[u8]) -> Result<Self, String> {
-        if patch_bytes.len() <= 12 {
-            return Err(ERR_BAD_PATCH.to_string());
-        }
-        // init pixmap
+    pub fn from_patch(patch_bytes: Bytes) -> Self {
+        // // TODO validate patch data DURING WAD loading!
+        // if patch_bytes.len() <= 12 {
+        //     return Err(ERR_BAD_PATCH.to_string());
+        // }
+
         let width = buf_to_u16(&patch_bytes[0..=1]);
         let height = buf_to_u16(&patch_bytes[2..=3]);
-        let left_offs = buf_to_i16(&patch_bytes[4..=5]);
-        let top_offs = buf_to_i16(&patch_bytes[6..=7]);
-        let pix_bytes_cnt = (width as usize) * (height as usize);
-        let transp_bytes_cnt = (pix_bytes_cnt + 7) << 3;
-        let mut pix = PixMap {
+        Self {
             width,
             height,
-            left_offs,
-            top_offs,
-            pixels: vec![0; pix_bytes_cnt + transp_bytes_cnt],
-        };
-        // parse each column
-        for x in 0..(width as usize) {
-            if patch_bytes.len() <= (x * 4 + 12) {
-                return Err(ERR_BAD_PATCH.to_string());
-            }
-            // prepare an array of transparent pixels
-            let mut column_pixels = vec![-1; height as usize];
-            // parse the posts of the column
-            let mut col_ofs = buf_to_u32(&patch_bytes[x * 4 + 8..x * 4 + 12]) as usize;
-            loop {
-                // check for loop end
-                let y_ofs = patch_bytes.get(col_ofs).cloned().unwrap_or(0xFF) as usize;
-                if y_ofs == 0xFF {
-                    break;
-                }
-                // parse the post bytes
-                let len = patch_bytes.get(col_ofs + 1).cloned().unwrap_or(0) as usize;
-                for y in 0..len {
-                    column_pixels[y + y_ofs] = patch_bytes.get(col_ofs + 3 + y).cloned().unwrap_or(PINK_PIXEL) as i32;
-                }
-                // advance to the next post
-                col_ofs += len + 4;
-            }
-            // put the column pixels into the pixmap
-            for y in 0..(height as usize) {
-                let pix_idx = y * (width as usize) + x;
-                if column_pixels[y] >= 0 {
-                    // normal pixel
-                    pix.pixels[pix_idx] = column_pixels[y] as u8;
-                } else {
-                    let transp_idx = pix_bytes_cnt + (pix_idx >> 3);
-                    let transp_bit = 1_u8 << (pix_idx & 0x07);
-                    pix.pixels[transp_idx] |= transp_bit;
-                }
-            }
-        }
-
-        Ok(pix)
-    }
-
-    pub fn convert_to_font(&mut self, mapper: &dyn ColorMapper) {
-        let size = (self.width as usize) * (self.height as usize);
-        if self.pixels.len() <= size || self.left_offs == FLAT_MARKER || self.left_offs == FONT_MARKER {
-            // nothing to do
-            return;
-        }
-        // convert pixels to gray shades + use 0 for transparency
-        let mut pix = vec![0; size];
-        let mut max_level = 0;
-        for idx in 0..size {
-            let transp_idx = size + (idx >> 3);
-            let transp_bit = 1_u8 << (idx & 0x07);
-            if self.pixels[transp_idx] & transp_bit == 0 {
-                let code = self.pixels[idx];
-                let rgb = mapper.byte2rgb(code);
-                let gray = ((rgb.r as u32) * 299 + (rgb.g as u32) * 587 + (rgb.b as u32) * 114) / 1000;
-                if max_level < gray {
-                    max_level = gray;
-                }
-                pix[idx] = match gray {
-                    0..=1 => 1,
-                    255.. => 255,
-                    _ => gray as u8,
-                };
-            }
-        }
-        // adjust gray levels
-        if max_level > 0 && max_level < 250 {
-            for idx in 0..size {
-                if pix[idx] != 0 {
-                    let adjusted = (pix[idx] as u32) * 255 / max_level;
-                    pix[idx] = adjusted as u8;
-                }
-            }
-        }
-        // replace pixmap
-        self.left_offs = FONT_MARKER;
-        self.pixels = pix;
-    }
-
-    pub fn paint(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
-        // compute origin
-        let x0 = x - if self.left_offs != FLAT_MARKER && self.left_offs != FONT_MARKER {
-            self.left_offs as i32
-        } else {
-            0
-        };
-        let y0 = y - (self.top_offs as i32);
-        // paint each pixel
-        let size = (self.width as usize) * (self.height as usize);
-        let has_transparency = self.pixels.len() > size;
-        let mut dx = -1;
-        let mut dy = 0;
-        for idx in 0..size {
-            // go to next coordinates
-            dx += 1;
-            if dx >= (self.width as i32) {
-                dx = 0;
-                dy += 1;
-            }
-            // get pixel
-            let pixcode = self.pixels[idx];
-            let is_transparent = match self.left_offs {
-                FONT_MARKER => pixcode == 0,
-                FLAT_MARKER => false,
-                _ => {
-                    has_transparency && {
-                        let transp_idx = size + (idx >> 3);
-                        let transp_bit = 1_u8 << (idx & 0x07);
-                        self.pixels[transp_idx] & transp_bit != 0
-                    }
-                }
-            };
-            // paint pixel
-            if !is_transparent {
-                let color = mapper.byte2rgb(pixcode);
-                painter.draw_pixel(x0 + dx, y0 + dy, color);
-            }
+            kind: PixMapKind::Patch,
+            data: patch_bytes,
         }
     }
 
@@ -215,4 +81,69 @@ impl PixMap {
     pub fn height(&self) -> u16 {
         self.height
     }
+
+    pub fn paint(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
+        if self.width > 0 && self.height > 0 {
+            match self.kind {
+                PixMapKind::Flat => self.paint_flat(x, y, painter, mapper),
+                PixMapKind::Patch => self.paint_patch(x, y, painter, mapper),
+                PixMapKind::PlaceHolder => self.paint_pink(x, y, painter),
+            }
+        }
+    }
+
+    fn paint_pink(&self, x: i32, y: i32, painter: &mut dyn Painter) {
+        for dy in 0 .. self.height as i32 {
+            for dx in 0 .. self.width as i32 {
+                painter.draw_pixel(x + dx, y + dy, RGB::from(255, 0, 255));
+            }
+        }
+    }
+
+    fn paint_flat(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
+        let mut idx = 0;
+        for dy in 0 .. self.height as i32 {
+            for dx in 0 .. self.width as i32 {
+                let pixcode = self.data[idx];
+                idx += 1;
+                let color = mapper.byte2rgb(pixcode);
+                painter.draw_pixel(x + dx, y + dy, color);
+            }
+        }
+    }
+
+    // TODO this may PANIC if the patch data is invalid and the index goes out of bounds
+    // => IDEA: improve validation of gfx patch data during wad initialization
+    fn paint_patch(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
+        let x0 = buf_to_i16(&self.data[4..6]) as i32;
+        let y0 = buf_to_i16(&self.data[6..8]) as i32;
+
+        let mut ofs_idx = 8;
+        for dx in 0 .. self.width as i32 {
+            // find the column index
+            let mut col_idx = buf_to_u32(&self.data[ofs_idx .. ofs_idx + 4]) as usize;
+            ofs_idx += 4;
+            loop {
+                let dy = self.data[col_idx] as i32;
+                if dy == 0xFF {
+                    break;
+                }
+                let len = self.data[col_idx + 1] as i32;
+                for i in 0 .. len {
+                    let pixcode = self.data[col_idx + 3 + (i as usize)];
+                    let color = mapper.byte2rgb(pixcode);
+                    painter.draw_pixel(x + dx - x0, y + dy + i - y0, color);
+                }
+                col_idx += 4 + (len as usize);
+            }
+        }
+    }
+
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PixMapKind {
+    Patch,
+    Flat,
+    PlaceHolder,
 }

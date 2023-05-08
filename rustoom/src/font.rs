@@ -7,20 +7,28 @@ use bytes::Bytes;
 
 pub struct Font {
     font: Vec<PixMap>,
+    grayscale: Vec<u8>,
     height: u16,
     spc_width: u16,
 }
 
 impl Font {
     pub fn new() -> Self {
+        // prepare a pseudo-grayscale palette
+        let mut grayscale = vec![0; 256];
+        for i in 1..256 {
+            grayscale[i] = i as u8;
+        }
+
         Font {
             font: vec![PixMap::new_empty(); 64],
+            grayscale,
             height: 0,
             spc_width: 0,
         }
     }
 
-    pub fn add_font_lump(&mut self, name: &str, bytes: Bytes, mapper: &dyn ColorMapper) -> Result<(), String> {
+    pub fn add_font_lump(&mut self, name: &str, bytes: Bytes) {
         if name.len() > 6 {
             // extract the code from the lump name
             let code = match &name[0..5] {
@@ -35,8 +43,7 @@ impl Font {
                 _ => 9999,
             } as usize;
             if idx <= 63 {
-                let mut p = PixMap::from_patch(&bytes)?;
-                p.convert_to_font(mapper);
+                let p = PixMap::from_patch(bytes);
                 self.height = p.height().max(self.height);
                 if idx == 39 {
                     self.spc_width = p.width();
@@ -44,7 +51,15 @@ impl Font {
                 self.font[idx] = p;
             }
         }
-        Ok(())
+    }
+
+    pub fn compute_grayscale(&mut self, palette: &Palette) {
+        for i in 0..=255 {
+            let rgb = palette.byte2rgb(i as u8);
+            // let gray = ((rgb.r as u32) * 30 + (rgb.g as u32) * 59 + (rgb.b as u32) * 11) / 100;
+            // HACK: just use RED level, so it works for DOOM's red-ish font
+            self.grayscale[i] = rgb.r;
+        }
     }
 
     pub fn is_complete(&self) -> bool {
@@ -52,7 +67,7 @@ impl Font {
     }
 
     pub fn draw_text(&self, x: i32, y: i32, text: &str, color: RGB, painter: &mut dyn Painter) {
-        let mapper = FontColorMapper(color);
+        let mapper = FontColorMapper(color, &self.grayscale);
         let mut dx = 0;
         for byte in text.bytes() {
             if byte <= 32 {
@@ -81,13 +96,14 @@ impl Font {
 //---------------
 
 /// Internal color mapper, for painting fonts
-struct FontColorMapper(RGB);
+struct FontColorMapper<'a>(RGB, &'a Vec<u8>);
 
-impl ColorMapper for FontColorMapper {
+impl<'a> ColorMapper for FontColorMapper<'a> {
     fn byte2rgb(&self, color: u8) -> RGB {
-        let r = (self.0.r as u32) * (color as u32) / 255;
-        let g = (self.0.g as u32) * (color as u32) / 255;
-        let b = (self.0.b as u32) * (color as u32) / 255;
+        let gray = self.1[color as usize] as u32;
+        let r = (self.0.r as u32) * gray / 255;
+        let g = (self.0.g as u32) * gray / 255;
+        let b = (self.0.b as u32) * gray / 255;
         RGB::from(r as u8, g as u8, b as u8)
     }
 }

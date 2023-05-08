@@ -128,32 +128,15 @@ impl Graphics {
     }
 
     pub fn get_patch(&self, key: u64) -> Option<PixMap> {
-        if let Some(bytes) = self.patches.get(&key) {
-            return match PixMap::from_patch(bytes) {
-                Ok(pixmap) => Some(pixmap),
-                Err(err) => {
-                    let name = lump_name_from_hash(key);
-                    println!("[ERROR] Failed to load patch {name}: {err}");
-                    None
-                }
-            };
-        }
-        None
+        self.patches.get(&key).map(|bytes| PixMap::from_patch(bytes.clone()))
     }
 
     pub fn get_flat(&self, key: u64) -> Option<PixMap> {
-        if let Some(bytes) = self.flats.get(&key) {
-            return Some(PixMap::from_flat(&bytes));
-        }
-        None
+        self.flats.get(&key).map(|bytes| PixMap::from_flat(bytes.clone()))
     }
 
     pub fn get_texture(&self, key: u64) -> Option<PixMap> {
-        if let Some(tex) = self.textures.get(&key) {
-            Some(self.build_texture_pixmap(tex))
-        } else {
-            None
-        }
+        self.textures.get(&key).map(|tex| self.build_texture_pixmap(tex))
     }
 
     //-----------------------

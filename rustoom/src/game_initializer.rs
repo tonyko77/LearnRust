@@ -81,7 +81,7 @@ impl DoomGameData {
                     } else if quick_check_if_lump_is_graphic(&lump.bytes) {
                         self.gfx.add_patch(&lump.name, lump.bytes.clone());
                         if is_font_name(&lump.name) {
-                            self.font.add_font_lump(&lump.name, lump.bytes.clone(), &self.pal)?;
+                            self.font.add_font_lump(&lump.name, lump.bytes.clone());
                         }
                     }
                 }
@@ -89,6 +89,9 @@ impl DoomGameData {
         }
 
         // set up textures
+        if self.pal.is_initialized() {
+            self.font.compute_grayscale(&self.pal);
+        }
         if pnames.is_empty() {
             return Err("PNAMES lump not found in WAD".to_string());
         }

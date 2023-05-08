@@ -42,6 +42,15 @@ impl Palette {
         self.pal_cnt > 0 && self.cmap_cnt > 0
     }
 
+    #[inline]
+    pub fn get_main_palette(&self) -> Bytes {
+        if self.palletes.len() >= 768 {
+            self.palletes.slice(0..768)
+        } else {
+            Bytes::new()
+        }
+    }
+
     pub fn select_palette(&mut self, pal: usize) -> Result<(), String> {
         if pal >= self.pal_cnt {
             Err(format!("Invalid palette index: {pal} >= {}", self.pal_cnt))
