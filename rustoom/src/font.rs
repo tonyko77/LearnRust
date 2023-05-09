@@ -44,12 +44,15 @@ impl Font {
         }
     }
 
-    pub fn compute_grayscale(&mut self, palette: &Palette) {
+    pub fn compute_grayscale(&mut self, playpal: &Bytes) {
+        assert!(playpal.len() >= 768);
         for i in 0..=255 {
-            let rgb = palette.byte2rgb(i as u8);
+            let r = playpal[i * 3 + 0];
+            let g = playpal[i * 3 + 1];
+            let b = playpal[i * 3 + 2];
             // HACK: just pick the max between R, G and B levels
             // (fonts are usually the same color, so it works for DOOM's red-ish font)
-            self.grayscale[i] = rgb.r.max(rgb.g.max(rgb.b));
+            self.grayscale[i] = r.max(g.max(b));
         }
     }
 

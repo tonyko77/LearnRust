@@ -1,7 +1,5 @@
 //! Pixel Maps (Patches, Flats, Fonts)
 
-// TODO !!! store bytes directly instead of loading + add a type enum + decode upon paint !!!
-
 use crate::utils::*;
 use crate::*;
 use bytes::Bytes;
@@ -134,12 +132,6 @@ impl PixMap {
                 col_idx += 4 + (len as usize);
             }
         }
-    }
-}
-
-impl Default for PixMap {
-    fn default() -> Self {
-        Self::new_empty()
     }
 }
 

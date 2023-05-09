@@ -2,16 +2,8 @@
 
 /*
 TODO:
-    - use Bytes in: Map/MapManager, PixMap etc:
-        * in PixMap:
-            - keep raw Bytes + a type flag (enum)
-            - decode on paint :) (should be easy)
-        * in textures:
-            - keep PNAMES directly as bytes! => no extra mem
-            - maybe even TEXTURES as bytes (+ maybe some indexes, for each texture)
-    - move automap code to separate module
-        - then: move all DEMO code separately (bottom part of this source file is OK)
-    - add BSP code
+    - add Player/Actor class - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes005/notes
+    - add BSP code - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes007/notes
     - doc comments !!
  */
 
@@ -24,7 +16,7 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
 pub struct DoomGame {
-    game: DoomGameData,
+    wad_data: WadData,
     map_idx: usize,
     map: MapData,
     _x_mode: i32,
@@ -35,10 +27,9 @@ pub struct DoomGame {
 }
 
 impl DoomGame {
-    pub fn new(wad: WadData) -> Result<DoomGame, String> {
-        let game = DoomGameData::build(wad)?;
+    pub fn new(wad_data: WadData) -> Result<DoomGame, String> {
         let mut engine = DoomGame {
-            game,
+            wad_data,
             map_idx: 9999,
             map: MapData::new(""),
             _x_mode: 0,
@@ -52,9 +43,9 @@ impl DoomGame {
     }
 
     pub fn load_map(&mut self, idx: usize) {
-        if self.map_idx != idx && idx < self.game.map_count() {
+        if self.map_idx != idx && idx < self.wad_data.map_count() {
             self.map_idx = idx;
-            self.map = self.game.map(idx).clone();
+            self.map = self.wad_data.map(idx).clone();
         }
     }
 
@@ -70,9 +61,9 @@ impl DoomGame {
         painter.draw_vert_line(xc, 0, sh, DARK_GREY);
         // draw sprite
         if !self._sprite_gfx.is_empty() {
-            self._sprite_gfx.paint(xc, yc, painter, self.game.palette());
+            self._sprite_gfx.paint(xc, yc, painter, self.wad_data.palette());
         } else {
-            self._tex_gfx.paint(xc, yc, painter, self.game.palette());
+            self._tex_gfx.paint(xc, yc, painter, self.wad_data.palette());
         }
 
         // draw sprite name
@@ -83,7 +74,7 @@ impl DoomGame {
             (self._tex_gfx.width() , self._tex_gfx.height())
         };
         let text = format!("{hdr}: {name} --> {w} x {h}");
-        self.game.font().draw_text(3, 3, &text, color, painter);
+        self.wad_data.font().draw_text(3, 3, &text, color, painter);
     }
 
     fn handle_key_down(&mut self, key: &Keycode) {
@@ -151,31 +142,31 @@ impl GraphicsLoop for DoomGame {
         // update map
         match self._x_mode {
             0 => {
-                let midx = self._x_idx % self.game.map_count();
+                let midx = self._x_idx % self.wad_data.map_count();
                 self.load_map(midx);
             }
             1 => {
-                let keys = self.game.graphics().dbg_patch_keys();
+                let keys = self.wad_data.graphics().dbg_patch_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
-                self._sprite_gfx = self.game.graphics().get_patch(k).unwrap();
+                self._sprite_gfx = self.wad_data.graphics().get_patch(k).unwrap();
                 self._tex_gfx = Texture::new();
                 self._sprite_key = k;
             }
             2 => {
-                let keys = self.game.graphics().dbg_flat_keys();
+                let keys = self.wad_data.graphics().dbg_flat_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
-                self._sprite_gfx = self.game.graphics().get_flat(k).unwrap();
+                self._sprite_gfx = self.wad_data.graphics().get_flat(k).unwrap();
                 self._tex_gfx = Texture::new();
                 self._sprite_key = k;
             }
             3 => {
-                let keys = self.game.graphics().dbg_texture_keys();
+                let keys = self.wad_data.graphics().dbg_texture_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
                 self._sprite_gfx = PixMap::new_empty();
-                self._tex_gfx = self.game.graphics().get_texture(k).unwrap();
+                self._tex_gfx = self.wad_data.graphics().get_texture(k).unwrap();
                 self._sprite_key = k;
             }
             _ => {
@@ -193,7 +184,7 @@ impl GraphicsLoop for DoomGame {
             1 => self.paint_graphics(painter, "PATCH", YELLOW),
             2 => self.paint_graphics(painter, "FLAT", CYAN),
             3 => self.paint_graphics(painter, "TEXTURE", WHITE),
-            _ => self.map.paint_automap(painter, self.game.font()),
+            _ => self.map.paint_automap(painter, self.wad_data.font()),
         }
     }
 }

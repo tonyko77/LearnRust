@@ -2,7 +2,6 @@
 
 mod font;
 mod game;
-mod game_initializer;
 mod graphics;
 mod map;
 mod painter;
@@ -14,7 +13,6 @@ mod wad;
 
 pub use font::*;
 pub use game::*;
-pub use game_initializer::*;
 pub use graphics::*;
 pub use map::*;
 pub use painter::*;

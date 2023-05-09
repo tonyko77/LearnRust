@@ -20,7 +20,7 @@ const WAD_PATH: &str = "DOOM1.WAD";
 
 fn main() -> Result<(), String> {
     // load the wad
-    let wad_data = WadData::load(WAD_PATH, WadKind::IWAD)?;
+    let wad_data = WadData::load(WAD_PATH, true)?;
 
     // build the game engine
     let mut doom_game = DoomGame::new(wad_data)?;
