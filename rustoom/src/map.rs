@@ -140,14 +140,14 @@ impl MapData {
         // draw the things
         for idx in 0..self.thing_count() {
             let thing = self.thing(idx);
-            let color = match thing.thing_type {
+            let color = match thing.type_code {
                 1 => WHITE,
                 2 => ORANGE,
                 3 => BLUE,
                 4 => GREEN,
                 _ => DARK_GREY,
             };
-            self.paint_cross(painter, thing.pos, color);
+            self.paint_cross(painter, thing.pos(), color);
         }
 
         // draw map name
@@ -164,8 +164,8 @@ impl MapData {
             let tcount = self.thing_count();
             for idx in 0..tcount {
                 let th = self.thing(idx);
-                if th.thing_type == 1 {
-                    self.amap_center = th.pos;
+                if th.type_code == 1 {
+                    self.amap_center = th.pos();
                     break;
                 }
             }
@@ -224,17 +224,8 @@ impl MapData {
     }
 
     fn thing(&self, idx: usize) -> Thing {
-        let i = idx * 10;
-        let bytes = self.lumps[IDX_THINGS].as_ref();
-        Thing {
-            pos: Vertex {
-                x: buf_to_i16(&bytes[(i + 0)..(i + 2)]) as i32,
-                y: buf_to_i16(&bytes[(i + 2)..(i + 4)]) as i32,
-            },
-            _angle: buf_to_u16(&bytes[(i + 4)..(i + 6)]),
-            thing_type: buf_to_u16(&bytes[(i + 6)..(i + 8)]),
-            _flags: buf_to_u16(&bytes[(i + 8)..(i + 10)]),
-        }
+        let bytes = &self.lumps[IDX_THINGS];
+        Thing::new(&bytes[(idx * 10)..(idx * 10 + 10)])
     }
 }
 
@@ -247,12 +238,4 @@ struct LineDef {
     pub _sector_tag: u16,
     pub _right_side_def: u16,
     pub _left_side_def: u16,
-}
-
-#[derive(Debug)]
-struct Thing {
-    pub pos: Vertex,
-    pub _angle: u16,
-    pub thing_type: u16,
-    pub _flags: u16,
 }

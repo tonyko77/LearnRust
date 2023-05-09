@@ -1,5 +1,6 @@
 //! Main lib for the RustooM Doom-like engine/demo
 
+mod actors;
 mod font;
 mod game;
 mod graphics;
@@ -11,6 +12,7 @@ mod sdl_wrapper;
 mod utils;
 mod wad;
 
+pub use actors::*;
 pub use font::*;
 pub use game::*;
 pub use graphics::*;
