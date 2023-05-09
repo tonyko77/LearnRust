@@ -38,3 +38,4 @@ pub const YELLOW: RGB = RGB { r: 160, g: 160, b: 0 };
 pub const BROWN: RGB = RGB { r: 160, g: 80, b: 0 };
 pub const CHOCO: RGB = RGB { r: 192, g: 128, b: 64 };
 pub const ORANGE: RGB = RGB { r: 255, g: 128, b: 0 };
+pub const PINK: RGB = RGB { r: 255, g: 0, b: 255 };

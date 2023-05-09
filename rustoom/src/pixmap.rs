@@ -72,11 +72,27 @@ impl PixMap {
         self.height
     }
 
+    #[inline]
+    pub fn x_offset(&self) -> i32 {
+        match self.kind {
+            PixMapKind::Patch => -buf_to_i16(&self.data[4..6]) as i32,
+            _ => 0,
+        }
+    }
+
+    #[inline]
+    pub fn y_offset(&self) -> i32 {
+        match self.kind {
+            PixMapKind::Patch => -buf_to_i16(&self.data[6..8]) as i32,
+            _ => 0,
+        }
+    }
+
     pub fn paint(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
         if self.width > 0 && self.height > 0 {
             match self.kind {
                 PixMapKind::Flat => self.paint_flat(x, y, painter, mapper),
-                PixMapKind::Patch => self.paint_patch(x, y, painter, mapper, None),
+                PixMapKind::Patch => self.paint_patch(x, y, painter, mapper),
                 PixMapKind::PlaceHolder => self.paint_pink(x, y, painter),
             }
         }
@@ -102,27 +118,43 @@ impl PixMap {
         }
     }
 
-    fn paint_patch(
+    #[inline(always)]
+    fn paint_patch(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
+        self.paint_patch_customized(
+            x,
+            y,
+            painter,
+            mapper,
+            self.x_offset(),
+            self.y_offset(),
+            self.width as i32,
+            self.height as i32,
+            false,
+        );
+    }
+
+    fn paint_patch_customized(
         &self,
         x: i32,
         y: i32,
         painter: &mut dyn Painter,
         mapper: &dyn ColorMapper,
-        custom_offs: Option<(i32, i32)>,
+        x_offs: i32,
+        y_offs: i32,
+        w: i32,
+        h: i32,
+        clip: bool,
     ) {
-        let (x_offs, y_offs) = if let Some((xc, yc)) = custom_offs {
-            (xc, yc)
-        } else {
-            (
-                -buf_to_i16(&self.data[4..6]) as i32,
-                -buf_to_i16(&self.data[6..8]) as i32,
-            )
-        };
         let mut ofs_idx = 8;
         for dx in 0..self.width as i32 {
             // find the column index
             let mut col_idx = buf_to_u32(&self.data[ofs_idx..ofs_idx + 4]) as usize;
             ofs_idx += 4;
+            // optimization: skip column in clip mode, if outside view port
+            let xx = dx + x_offs;
+            if clip && (xx < 0 || xx >= w) {
+                continue;
+            }
             loop {
                 let dy = self.data[col_idx] as i32;
                 if dy == 0xFF {
@@ -130,9 +162,13 @@ impl PixMap {
                 }
                 let len = self.data[col_idx + 1] as i32;
                 for i in 0..len {
+                    let yy = dy + i + y_offs;
+                    if clip && (yy < 0 || yy >= h) {
+                        continue;
+                    }
                     let pixcode = self.data[col_idx + 3 + (i as usize)];
                     let color = mapper.byte2rgb(pixcode);
-                    painter.draw_pixel(x + dx + x_offs, y + dy + i + y_offs, color);
+                    painter.draw_pixel(x + xx, y + yy, color);
                 }
                 col_idx += 4 + (len as usize);
             }
@@ -180,8 +216,17 @@ impl Texture {
     pub fn paint(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
         if self.width > 0 && self.height > 0 {
             for patch in &self.patches {
-                let co = (patch.x_orig as i32, patch.y_orig as i32);
-                patch.pixmap.paint_patch(x, y, painter, mapper, Some(co));
+                patch.pixmap.paint_patch_customized(
+                    x,
+                    y,
+                    painter,
+                    mapper,
+                    patch.x_orig as i32,
+                    patch.y_orig as i32,
+                    self.width as i32,
+                    self.height as i32,
+                    true,
+                );
             }
         }
     }

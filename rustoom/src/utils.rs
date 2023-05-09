@@ -33,8 +33,10 @@ pub fn hash_lump_name(name: &[u8]) -> u64 {
     for b in name {
         let bb = match *b {
             A..=Z => *b - 32,
-            0 => { return key; },
-            _ => *b
+            0 => {
+                return key;
+            }
+            _ => *b,
         };
         key = (key << 8) | (bb as u64);
     }
@@ -57,14 +59,13 @@ pub fn lump_name_from_hash(key: u64) -> String {
     let mut bytes = Vec::with_capacity(8);
     let mut key = key;
     while key > 0 {
-        let b = (key & 0x3F) as u8;
+        let b = (key & 0xFF) as u8;
         let c = match b {
-            0..=31 => b + 64,
             32..=126 => b,
             _ => 63,
         };
         bytes.push(c);
-        key = key >> 6;
+        key = key >> 8;
     }
     bytes.reverse();
     String::from_utf8(bytes).unwrap()
