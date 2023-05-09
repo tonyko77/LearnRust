@@ -73,7 +73,7 @@ impl DoomGameData {
             // parse map lumps
             if parsing_map.is_some() {
                 let mut map = parsing_map.unwrap();
-                let still_parsing = map.add_lump(&lump.name, lump.bytes.clone());
+                let still_parsing = map.add_lump(&lump.name, &lump.bytes);
                 if still_parsing {
                     parsing_map = Some(map);
                     continue;
@@ -92,8 +92,8 @@ impl DoomGameData {
             }
 
             match lump.name.as_str() {
-                "PLAYPAL" => self.pal.init_palettes(lump.bytes),
-                "COLORMAP" => self.pal.init_colormaps(lump.bytes),
+                "PLAYPAL" => self.pal.init_palettes(&lump.bytes),
+                "COLORMAP" => self.pal.init_colormaps(&lump.bytes),
                 "PNAMES" => pnames = lump.bytes.clone(),
                 "F_START" => is_flats = true,
                 "F_END" => is_flats = false,
@@ -101,11 +101,11 @@ impl DoomGameData {
                     if is_texture_name(&lump.name) {
                         textures.push(lump.bytes);
                     } else if has_bytes && is_flats {
-                        self.gfx.add_flat(&lump.name, lump.bytes.clone());
+                        self.gfx.add_flat(&lump.name, &lump.bytes);
                     } else if quick_check_if_lump_is_graphic(&lump.bytes) {
-                        self.gfx.add_patch(&lump.name, lump.bytes.clone());
+                        self.gfx.add_patch(&lump.name, &lump.bytes);
                         if is_font_name(&lump.name) {
-                            self.font.add_font_lump(&lump.name, lump.bytes.clone());
+                            self.font.add_font_lump(&lump.name, &lump.bytes);
                         }
                     }
                 }

@@ -48,7 +48,7 @@ pub fn hash_lump_name(name: &[u8]) -> u64 {
     let mut key = 0_u64;
     for b in name {
         if *b == 0 {
-            break;
+            return key;
         }
         key = (key << 6) + ((*b & 0x3F) as u64);
     }

@@ -4,6 +4,7 @@ use crate::utils::*;
 use crate::*;
 use bytes::Bytes;
 
+// Indexes for various MapData lumps
 const IDX_THINGS: usize = 0;
 const IDX_LINEDEFS: usize = 1;
 const IDX_SIDEDEFS: usize = 2;
@@ -27,15 +28,15 @@ const LINE_SECRET: u16 = 0x0020;
 const LINE_NEVER_ON_AMAP: u16 = 0x0080;
 const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
-const DEFAULT_AUTOMAP_ZOOM_PERCENT: i32 = 10;
+// Automap zoom limits
+const DEFAULT_AUTOMAP_ZOOM: i32 = 12;
 const AUTOMAP_ZOOM_MIN: i32 = 5;
-const AUTOMAP_ZOOM_MAX: i32 = 50;
+const AUTOMAP_ZOOM_MAX: i32 = 60;
 
-// TODO use i32 !!?
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct Vertex {
-    pub x: i16,
-    pub y: i16,
+    pub x: i32,
+    pub y: i32,
 }
 
 pub struct MapData {
@@ -63,12 +64,12 @@ impl MapData {
         Self {
             name: name.to_string(),
             lumps,
-            amap_zoom: DEFAULT_AUTOMAP_ZOOM_PERCENT,
+            amap_zoom: DEFAULT_AUTOMAP_ZOOM,
             amap_center: Vertex { x: 0, y: 0 },
         }
     }
 
-    pub fn add_lump(&mut self, lump: &str, bytes: Bytes) -> bool {
+    pub fn add_lump(&mut self, lump: &str, bytes: &Bytes) -> bool {
         let idx = match lump {
             "VERTEXES" => IDX_VERTEXES,
             "LINEDEFS" => IDX_LINEDEFS,
@@ -82,8 +83,10 @@ impl MapData {
             "BLOCKMAP" => IDX_BLOCKMAP,
             _ => usize::MAX,
         };
+        // check if it was a valid lump; if not => return false, to signal the end of the map lumps
+        // (all the lumps of one map are consecutive, so if we get an invalid one => we're done with this map)
         if idx < LUMP_CNT {
-            self.lumps[idx] = bytes;
+            self.do_add_lump(idx, bytes.clone());
             true
         } else {
             false
@@ -100,7 +103,7 @@ impl MapData {
         self.lumps.iter().all(|b| b.len() > 0)
     }
 
-    pub fn move_automap(&mut self, dx: i16, dy: i16) {
+    pub fn move_automap(&mut self, dx: i32, dy: i32) {
         self.amap_center.x += dx;
         self.amap_center.y += dy;
     }
@@ -152,6 +155,23 @@ impl MapData {
         font.draw_text(3, 3, &txt, ORANGE, painter);
     }
 
+    //---------------
+
+    fn do_add_lump(&mut self, lump_idx: usize, bytes: Bytes) {
+        self.lumps[lump_idx] = bytes;
+        // if added things => also fetch 1st player's location
+        if lump_idx == IDX_THINGS {
+            let tcount = self.thing_count();
+            for idx in 0..tcount {
+                let th = self.thing(idx);
+                if th.thing_type == 1 {
+                    self.amap_center = th.pos;
+                    break;
+                }
+            }
+        }
+    }
+
     fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> (i32, i32) {
         // scale the original coordinates
         let xs = ((orig_vertex.x - self.amap_center.x) as i32) * self.amap_zoom / 100;
@@ -172,8 +192,8 @@ impl MapData {
         let i = idx << 2;
         let bytes = self.lumps[IDX_VERTEXES].as_ref();
         Vertex {
-            x: buf_to_i16(&bytes[(i + 0)..(i + 2)]),
-            y: buf_to_i16(&bytes[(i + 2)..(i + 4)]),
+            x: buf_to_i16(&bytes[(i + 0)..(i + 2)]) as i32,
+            y: buf_to_i16(&bytes[(i + 2)..(i + 4)]) as i32,
         }
     }
 
@@ -208,8 +228,8 @@ impl MapData {
         let bytes = self.lumps[IDX_THINGS].as_ref();
         Thing {
             pos: Vertex {
-                x: buf_to_i16(&bytes[(i + 0)..(i + 2)]),
-                y: buf_to_i16(&bytes[(i + 2)..(i + 4)]),
+                x: buf_to_i16(&bytes[(i + 0)..(i + 2)]) as i32,
+                y: buf_to_i16(&bytes[(i + 2)..(i + 4)]) as i32,
             },
             _angle: buf_to_u16(&bytes[(i + 4)..(i + 6)]),
             thing_type: buf_to_u16(&bytes[(i + 6)..(i + 8)]),
@@ -218,6 +238,7 @@ impl MapData {
     }
 }
 
+#[derive(Debug)]
 struct LineDef {
     pub v1: Vertex,
     pub v2: Vertex,

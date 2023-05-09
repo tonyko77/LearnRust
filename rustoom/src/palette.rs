@@ -25,15 +25,15 @@ impl Palette {
         }
     }
 
-    pub fn init_palettes(&mut self, bytes: Bytes) {
+    pub fn init_palettes(&mut self, bytes: &Bytes) {
         self.pal_cnt = bytes.len() / 768;
-        self.palletes = bytes;
+        self.palletes = bytes.clone();
         self.pal_selection = 0;
     }
 
-    pub fn init_colormaps(&mut self, bytes: Bytes) {
+    pub fn init_colormaps(&mut self, bytes: &Bytes) {
         self.cmap_cnt = bytes.len() / 256;
-        self.colormaps = bytes;
+        self.colormaps = bytes.clone();
         self.cmap_selection = 0;
     }
 

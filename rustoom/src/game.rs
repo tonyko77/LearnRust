@@ -6,9 +6,6 @@ TODO:
         * in PixMap:
             - keep raw Bytes + a type flag (enum)
             - decode on paint :) (should be easy)
-        * in MapManager:
-            - store the Bytes for each lump !!
-            - some lumps don't really require extraction => just keep them as they are
         * in textures:
             - keep PNAMES directly as bytes! => no extra mem
             - maybe even TEXTURES as bytes (+ maybe some indexes, for each texture)
@@ -34,6 +31,7 @@ pub struct DoomGame {
     _x_idx: usize,
     _sprite_key: u64,
     _sprite_gfx: PixMap,
+    _tex_gfx: Texture,
 }
 
 impl DoomGame {
@@ -47,6 +45,7 @@ impl DoomGame {
             _x_idx: 0,
             _sprite_key: 0,
             _sprite_gfx: PixMap::new_empty(),
+            _tex_gfx: Texture::new(),
         };
         engine.update_state(0.0);
         Ok(engine)
@@ -70,11 +69,19 @@ impl DoomGame {
         painter.draw_horiz_line(0, sw, yc, DARK_GREY);
         painter.draw_vert_line(xc, 0, sh, DARK_GREY);
         // draw sprite
-        self._sprite_gfx.paint(xc, yc, painter, self.game.palette());
+        if !self._sprite_gfx.is_empty() {
+            self._sprite_gfx.paint(xc, yc, painter, self.game.palette());
+        } else {
+            self._tex_gfx.paint(xc, yc, painter, self.game.palette());
+        }
+
         // draw sprite name
         let name = lump_name_from_hash(self._sprite_key);
-        let w = self._sprite_gfx.width();
-        let h = self._sprite_gfx.height();
+        let (w, h) =          if !self._sprite_gfx.is_empty() {
+            (self._sprite_gfx.width() ,self._sprite_gfx.height() )
+        } else {
+            (self._tex_gfx.width() , self._tex_gfx.height())
+        };
         let text = format!("{hdr}: {name} --> {w} x {h}");
         self.game.font().draw_text(3, 3, &text, color, painter);
     }
@@ -152,6 +159,7 @@ impl GraphicsLoop for DoomGame {
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
                 self._sprite_gfx = self.game.graphics().get_patch(k).unwrap();
+                self._tex_gfx = Texture::new();
                 self._sprite_key = k;
             }
             2 => {
@@ -159,13 +167,15 @@ impl GraphicsLoop for DoomGame {
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
                 self._sprite_gfx = self.game.graphics().get_flat(k).unwrap();
+                self._tex_gfx = Texture::new();
                 self._sprite_key = k;
             }
             3 => {
                 let keys = self.game.graphics().dbg_texture_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
-                self._sprite_gfx = self.game.graphics().get_texture(k).unwrap();
+                self._sprite_gfx = PixMap::new_empty();
+                self._tex_gfx = self.game.graphics().get_texture(k).unwrap();
                 self._sprite_key = k;
             }
             _ => {

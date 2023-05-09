@@ -41,24 +41,26 @@ impl PixMap {
         }
     }
 
-    pub fn from_flat(flat_bytes: Bytes) -> Self {
-        let height = (flat_bytes.len() >> 6) as u16;
+    pub fn from_flat(flat_bytes: &Bytes) -> Self {
+        let data = flat_bytes.clone();
+        let height = (data.len() >> 6) as u16;
         Self {
             width: 64,
             height,
             kind: PixMapKind::Flat,
-            data: flat_bytes,
+            data,
         }
     }
 
-    pub fn from_patch(patch_bytes: Bytes) -> Self {
-        let width = buf_to_u16(&patch_bytes[0..=1]);
-        let height = buf_to_u16(&patch_bytes[2..=3]);
+    pub fn from_patch(patch_bytes: &Bytes) -> Self {
+        let data = patch_bytes.clone();
+        let width = buf_to_u16(&data[0..=1]);
+        let height = buf_to_u16(&data[2..=3]);
         Self {
             width,
             height,
             kind: PixMapKind::Patch,
-            data: patch_bytes,
+            data,
         }
     }
 
@@ -141,6 +143,7 @@ impl Default for PixMap {
     }
 }
 
+/// Internal enum for the various kinds of pixel maps.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum PixMapKind {
     Patch,
