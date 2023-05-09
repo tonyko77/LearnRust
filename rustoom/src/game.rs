@@ -54,12 +54,12 @@ impl DoomGame {
     //----------------
 
     fn paint_graphics(&self, painter: &mut dyn Painter, hdr: &str, text_color: RGB) {
-        const CC: i32 = 140;
+        const CC: i32 = 120;
         // draw center lines
         let sw = painter.get_screen_width();
         let sh = painter.get_screen_height();
-        painter.draw_horiz_line(0, sw, CC, DARK_GREY);
-        painter.draw_vert_line(CC, 0, sh, DARK_GREY);
+        painter.draw_horiz_line(0, sw, CC, VERY_DARK_GREY);
+        painter.draw_vert_line(CC, 0, sh, VERY_DARK_GREY);
 
         // draw sprite
         self._sprite_gfx.paint(CC, CC, painter, self.wad_data.palette());
@@ -78,12 +78,12 @@ impl DoomGame {
     }
 
     fn paint_texture(&self, painter: &mut dyn Painter, hdr: &str, text_color: RGB) {
-        const CC: i32 = 60;
+        const CC: i32 = 120;
         // draw center lines
         let sw = painter.get_screen_width();
         let sh = painter.get_screen_height();
-        painter.draw_horiz_line(0, sw, CC, DARK_GREY);
-        painter.draw_vert_line(CC, 0, sh, DARK_GREY);
+        painter.draw_horiz_line(0, sw, CC, VERY_DARK_GREY);
+        painter.draw_vert_line(CC, 0, sh, VERY_DARK_GREY);
 
         // draw texture
         let (w, h) = (self._tex_gfx.width() as i32, self._tex_gfx.height() as i32);

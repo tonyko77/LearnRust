@@ -1,6 +1,5 @@
 //! Main lib for the RustooM Doom-like engine/demo
 
-mod actors;
 mod font;
 mod game;
 mod graphics;
@@ -9,10 +8,10 @@ mod painter;
 mod palette;
 mod pixmap;
 mod sdl_wrapper;
+mod things;
 mod utils;
 mod wad;
 
-pub use actors::*;
 pub use font::*;
 pub use game::*;
 pub use graphics::*;
@@ -21,10 +20,12 @@ pub use painter::*;
 pub use palette::*;
 pub use pixmap::*;
 pub use sdl_wrapper::*;
+pub use things::*;
 pub use wad::*;
 
 // TODO clean up unused colors (+ move them in another mod ?)
 pub const BLACK: RGB = RGB { r: 0, g: 0, b: 0 };
+pub const VERY_DARK_GREY: RGB = RGB { r: 32, g: 32, b: 32 };
 pub const DARK_GREY: RGB = RGB { r: 64, g: 64, b: 64 };
 pub const GREY: RGB = RGB { r: 128, g: 128, b: 128 };
 pub const LIGHT_GREY: RGB = RGB { r: 192, g: 192, b: 192 };

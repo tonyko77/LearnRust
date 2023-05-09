@@ -103,6 +103,22 @@ impl MapData {
         self.lumps.iter().all(|b| b.len() > 0)
     }
 
+    pub fn get_things(&self, level_filter: u8) -> Vec<Thing> {
+        let cnt = self.thing_count();
+        (0..cnt)
+            .map(|idx| self.thing(idx))
+            .filter(|th| th.is_on_skill_level(level_filter))
+            .collect()
+    }
+
+    pub fn get_player(&self) -> Thing {
+        let cnt = self.thing_count();
+        (0..cnt)
+            .map(|idx| self.thing(idx))
+            .find(|th| th.type_code() == 1)
+            .expect("Player not found in map's THINGS")
+    }
+
     pub fn move_automap(&mut self, dx: i32, dy: i32) {
         self.amap_center.x += dx;
         self.amap_center.y += dy;
@@ -138,9 +154,8 @@ impl MapData {
             painter.draw_line(x1, y1, x2, y2, color);
         }
         // draw the things
-        for idx in 0..self.thing_count() {
-            let thing = self.thing(idx);
-            let color = match thing.type_code {
+        for thing in self.get_things(0) {
+            let color = match thing.type_code() {
                 1 => WHITE,
                 2 => ORANGE,
                 3 => BLUE,
@@ -164,7 +179,7 @@ impl MapData {
             let tcount = self.thing_count();
             for idx in 0..tcount {
                 let th = self.thing(idx);
-                if th.type_code == 1 {
+                if th.type_code() == 1 {
                     self.amap_center = th.pos();
                     break;
                 }
