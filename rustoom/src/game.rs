@@ -36,7 +36,7 @@ impl DoomGame {
             _x_idx: 0,
             _sprite_key: 0,
             _sprite_gfx: PixMap::new_empty(),
-            _tex_gfx: Texture::new(),
+            _tex_gfx: Texture::new(0, 0, 0),
         };
         engine.update_state(0.0);
         Ok(engine)
@@ -68,10 +68,10 @@ impl DoomGame {
 
         // draw sprite name
         let name = lump_name_from_hash(self._sprite_key);
-        let (w, h) =          if !self._sprite_gfx.is_empty() {
-            (self._sprite_gfx.width() ,self._sprite_gfx.height() )
+        let (w, h) = if !self._sprite_gfx.is_empty() {
+            (self._sprite_gfx.width(), self._sprite_gfx.height())
         } else {
-            (self._tex_gfx.width() , self._tex_gfx.height())
+            (self._tex_gfx.width(), self._tex_gfx.height())
         };
         let text = format!("{hdr}: {name} --> {w} x {h}");
         self.wad_data.font().draw_text(3, 3, &text, color, painter);
@@ -149,16 +149,22 @@ impl GraphicsLoop for DoomGame {
                 let keys = self.wad_data.graphics().dbg_patch_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
-                self._sprite_gfx = self.wad_data.graphics().get_patch(k).unwrap();
-                self._tex_gfx = Texture::new();
+                self._sprite_gfx = self
+                    .wad_data
+                    .graphics()
+                    .get_patch(k)
+                    .expect(format!("texture not found: {kidx} >= {}", keys.len()).as_str());
                 self._sprite_key = k;
             }
             2 => {
                 let keys = self.wad_data.graphics().dbg_flat_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
-                self._sprite_gfx = self.wad_data.graphics().get_flat(k).unwrap();
-                self._tex_gfx = Texture::new();
+                self._sprite_gfx = self
+                    .wad_data
+                    .graphics()
+                    .get_flat(k)
+                    .expect(format!("texture not found: {kidx} >= {}", keys.len()).as_str());
                 self._sprite_key = k;
             }
             3 => {
@@ -166,7 +172,11 @@ impl GraphicsLoop for DoomGame {
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
                 self._sprite_gfx = PixMap::new_empty();
-                self._tex_gfx = self.wad_data.graphics().get_texture(k).unwrap();
+                self._tex_gfx = self
+                    .wad_data
+                    .graphics()
+                    .get_texture(k)
+                    .expect(format!("texture not found: {kidx} >= {}", keys.len()).as_str());
                 self._sprite_key = k;
             }
             _ => {

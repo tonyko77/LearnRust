@@ -105,76 +105,24 @@ impl Graphics {
         self.flats.get(&key).map(|bytes| PixMap::from_flat(&bytes))
     }
 
-    // TODO maybe I can improve this mess ??
     pub fn get_texture(&self, key: u64) -> Option<Texture> {
         // get texture
         let tex_bytes = self.textures.get(&key)?;
         let width = buf_to_u16(&tex_bytes[12..14]);
         let height = buf_to_u16(&tex_bytes[14..16]);
         let patch_cnt = buf_to_u16(&tex_bytes[20..22]) as usize;
-        let mut texture = Texture {
-            width,
-            height,
-            patches: Vec::with_capacity(patch_cnt),
-        };
+        let mut texture = Texture::new(width, height, patch_cnt);
         // get all patches for this texture
         for idx in 0..patch_cnt {
             let pofs = 22 + 10 * idx;
-            let origin_x = buf_to_i16(&tex_bytes[(pofs + 0)..(pofs + 2)]) as i32;
-            let origin_y = buf_to_i16(&tex_bytes[(pofs + 2)..(pofs + 4)]) as i32;
+            let x_orig = buf_to_i16(&tex_bytes[(pofs + 0)..(pofs + 2)]);
+            let y_orig = buf_to_i16(&tex_bytes[(pofs + 2)..(pofs + 4)]);
             let patch_idx = buf_to_u16(&tex_bytes[(pofs + 4)..(pofs + 6)]) as usize;
+            let name = std::str::from_utf8(&self.pnames[(patch_idx * 8 + 4)..(patch_idx * 8 + 12)]).unwrap();
             let patch_key = hash_lump_name(&self.pnames[(patch_idx * 8 + 4)..(patch_idx * 8 + 12)]);
-            let pixmap = self.get_patch(patch_key)?;
-            texture.patches.push(TexturePatch {
-                origin_x,
-                origin_y,
-                pixmap,
-            });
+            let patch_bytes = self.patches.get(&patch_key).expect(format!("PATCH bytes not found: {name}").as_str());
+            texture.add_patch(patch_bytes, x_orig, y_orig);
         }
         Some(texture)
     }
-}
-
-//----------------------------
-
-// TODO move this to separate source file? Or maybe pixmap.rs ??
-pub struct Texture {
-    width: u16,
-    height: u16,
-    patches: Vec<TexturePatch>,
-}
-
-impl Texture {
-    pub fn new() -> Texture {
-        Texture {
-            width: 0,
-            height: 0,
-            patches: Vec::new(),
-        }
-    }
-
-    #[inline]
-    pub fn width(&self) -> u16 {
-        self.width
-    }
-
-    #[inline]
-    pub fn height(&self) -> u16 {
-        self.height
-    }
-
-    // TODO this is BROKEN - WHY ????
-    pub fn paint(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
-        if self.width > 0 && self.height > 0 {
-            for patch in &self.patches {
-                patch.pixmap.paint(x + patch.origin_x, y - patch.origin_y, painter, mapper);
-            }
-        }
-    }
-}
-
-struct TexturePatch {
-    origin_x: i32,
-    origin_y: i32,
-    pixmap: PixMap,
 }
