@@ -6,7 +6,6 @@
 #[inline]
 pub fn buf_to_u16(buf: &[u8]) -> u16 {
     assert!(buf.len() >= 2);
-
     (buf[0] as u16) | ((buf[1] as u16) << 8)
 }
 
@@ -18,8 +17,16 @@ pub fn buf_to_i16(buf: &[u8]) -> i16 {
 #[inline]
 pub fn buf_to_u32(buf: &[u8]) -> u32 {
     assert!(buf.len() >= 4);
-
     (buf[0] as u32) | ((buf[1] as u32) << 8) | ((buf[2] as u32) << 16) | ((buf[3] as u32) << 24)
+}
+
+pub fn buf_to_i16_vect(buf: &[u8]) -> Vec<i16> {
+    let cnt = buf.len() >> 1;
+    let mut vct = Vec::with_capacity(cnt);
+    for i in 0..cnt {
+        vct.push(buf_to_i16(&buf[i * 2..]));
+    }
+    vct
 }
 
 /// Convert a lump name into a 64 bit integer, for easier use as key in a hashmap.

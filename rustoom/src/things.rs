@@ -21,6 +21,7 @@ pub enum ThingType {
     Unknown,
 }
 
+#[derive(Clone, Default)]
 pub struct Thing {
     pos: Vertex,
     angle: i16,

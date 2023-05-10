@@ -1,24 +1,64 @@
 //! An "active" level map, where all the map data is expanded and "mutable".
 //! Built from an existing MapData.
 
-use crate::bsp::*;
+use crate::map::*;
 use crate::utils::*;
 use crate::*;
-use bytes::Bytes;
+
+// LineDef flags
+const LINE_BLOCKS: u16 = 0x0001;
+//const LINE_BLOCKS_MONSTERS: u16 = 0x0002;
+const LINE_TWO_SIDED: u16 = 0x0004;
+//const LINE_UPPER_UNPEGGED: u16 = 0x0008;
+//const LINE_LOWER_UNPEGGED: u16 = 0x0010;
+const LINE_SECRET: u16 = 0x0020;
+//const LINE_BLOCKS_SND: u16 = 0x0040;
+const LINE_NEVER_ON_AMAP: u16 = 0x0080;
+const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
+
+// Automap zoom limits
+const DEFAULT_AUTOMAP_ZOOM: i32 = 12;
+const AUTOMAP_ZOOM_MIN: i32 = 5;
+const AUTOMAP_ZOOM_MAX: i32 = 60;
 
 pub struct LevelMap {
-    name: String,
-    vertexes: Bytes,
-    linedefs: Bytes,
-    sidedefs: Bytes,
-    things: Bytes,
-    bsp: BspTree,
+    map_data: MapData,
+    // TODO bsp: BspTree,
+    player: Thing,
+    amap_center: Vertex,
+    amap_bl: Vertex,
+    amap_tr: Vertex,
+    amap_zoom: i32,
 }
 
 impl LevelMap {
+    pub fn new(map: &MapData) -> Self {
+        let mut map = Self {
+            map_data: map.clone(),
+            // TODO bsp: BspTree::new(),
+            player: Default::default(),
+            amap_center: Vertex { x: 0, y: 0 },
+            amap_bl: Vertex { x: 0, y: 0 },
+            amap_tr: Vertex { x: 0, y: 0 },
+            amap_zoom: DEFAULT_AUTOMAP_ZOOM,
+        };
+        // compute bounds
+        map.compute_automap_bounds();
+        // fetch player
+        if let Some(th) = map.find_thing_by_type(1) {
+            map.amap_center = th.pos();
+            map.player = th;
+        } else {
+            // TODO improve error handling ?!
+            panic!("No player found in map's THINGS");
+        }
+        // TODO map.build_bsp();
+        map
+    }
+
     #[inline]
     pub fn name(&self) -> &str {
-        &self.name
+        &self.map_data.name()
     }
 
     pub fn get_things(&self, level_filter: u8) -> Vec<Thing> {
@@ -74,26 +114,22 @@ impl LevelMap {
         }
 
         // draw map name
-        let txt = format!("Map: {}", self.name);
+        let txt = format!("Map: {}", self.name());
         font.draw_text(3, 3, &txt, ORANGE, painter);
     }
 
-    //---------------
-
-    fn do_add_lump(&mut self, lump_idx: usize, bytes: Bytes) {
-        self.lumps[lump_idx] = bytes;
-        // if added things => also fetch 1st player's location
-        if lump_idx == IDX_THINGS {
-            let tcount = self.thing_count();
-            for idx in 0..tcount {
-                let th = self.thing(idx);
-                if th.type_code() == 1 {
-                    self.amap_center = th.pos();
-                    break;
-                }
-            }
-        }
+    pub fn move_automap(&mut self, dx: i32, dy: i32) {
+        self.amap_center.x = Ord::clamp(self.amap_center.x + dx, self.amap_bl.x, self.amap_tr.x);
+        self.amap_center.y = Ord::clamp(self.amap_center.y + dy, self.amap_bl.y, self.amap_tr.y);
     }
+
+    pub fn zoom_automap(&mut self, dzoom: i32) {
+        self.amap_zoom = Ord::clamp(self.amap_zoom + dzoom, AUTOMAP_ZOOM_MIN, AUTOMAP_ZOOM_MAX);
+    }
+
+    //---------------
+    // private methods
+    //---------------
 
     fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> (i32, i32) {
         // scale the original coordinates
@@ -111,9 +147,14 @@ impl LevelMap {
         painter.draw_line(x, y - 1, x, y + 1, color);
     }
 
+    #[inline]
+    fn vertex_count(&self) -> usize {
+        self.map_data.vertexes().len() >> 2
+    }
+
     fn vertex(&self, idx: usize) -> Vertex {
         let i = idx << 2;
-        let bytes = self.lumps[IDX_VERTEXES].as_ref();
+        let bytes = self.map_data.vertexes();
         Vertex {
             x: buf_to_i16(&bytes[(i + 0)..(i + 2)]) as i32,
             y: buf_to_i16(&bytes[(i + 2)..(i + 4)]) as i32,
@@ -122,12 +163,12 @@ impl LevelMap {
 
     #[inline]
     fn line_count(&self) -> usize {
-        self.lumps[IDX_LINEDEFS].len() / 14
+        self.map_data.linedefs().len() / 14
     }
 
     fn linedef(&self, idx: usize) -> LineDef {
         let i = idx * 14;
-        let bytes = self.lumps[IDX_LINEDEFS].as_ref();
+        let bytes = self.map_data.linedefs();
         let vi1 = buf_to_u16(&bytes[(i + 0)..(i + 2)]);
         let vi2 = buf_to_u16(&bytes[(i + 2)..(i + 4)]);
         LineDef {
@@ -143,11 +184,34 @@ impl LevelMap {
 
     #[inline]
     fn thing_count(&self) -> usize {
-        self.things.len() / 10
+        self.map_data.things().len() / 10
     }
 
     fn thing(&self, idx: usize) -> Thing {
-        Thing::new(&self.things[(idx * 10)..(idx * 10 + 10)])
+        let bytes = self.map_data.things();
+        Thing::new(&bytes[(idx * 10)..(idx * 10 + 10)])
+    }
+
+    fn compute_automap_bounds(&mut self) {
+        self.amap_bl = self.vertex(0);
+        self.amap_tr = self.vertex(0);
+        for idx in 1..self.vertex_count() {
+            let v = self.vertex(idx);
+            self.amap_bl.x = Ord::min(self.amap_bl.x, v.x);
+            self.amap_bl.y = Ord::min(self.amap_bl.y, v.y);
+            self.amap_tr.x = Ord::max(self.amap_tr.x, v.x);
+            self.amap_tr.y = Ord::max(self.amap_tr.y, v.y);
+        }
+    }
+
+    fn find_thing_by_type(&self, thing_type: u16) -> Option<Thing> {
+        for idx in 0..self.thing_count() {
+            let th = self.thing(idx);
+            if th.type_code() == thing_type {
+                return Some(th);
+            }
+        }
+        None
     }
 }
 

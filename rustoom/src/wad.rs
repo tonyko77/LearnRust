@@ -1,7 +1,8 @@
 //! WAD loader and parser.
 //! See [DIYDoom, Notes001](https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes001/notes).
 
-use crate::{utils, Palette, MapData, Font, Graphics};
+use crate::map::*;
+use crate::*;
 use bytes::{Bytes, BytesMut};
 use std::fs::*;
 use std::io::Read;
@@ -61,8 +62,17 @@ impl WadData {
     }
 
     #[inline]
-    pub fn map(&self, idx: usize) -> &MapData {
-        &self.maps[idx]
+    pub fn map_name(&self, idx: usize) -> &str {
+        // TODO panic-safe error handling ?!?
+        assert!(idx < self.maps.len());
+        &self.maps[idx].name()
+    }
+
+    #[inline]
+    pub fn load_map(&self, idx: usize) -> LevelMap {
+        // TODO panic-safe error handling ?!?
+        assert!(idx < self.maps.len());
+        LevelMap::new(&self.maps[idx])
     }
 
     #[inline]
@@ -88,9 +98,9 @@ impl WadData {
         // parse each lump
         for lump_idx in 0..lump_count {
             let offs = dir_offset + 16 * lump_idx;
-            let lump_start = utils::buf_to_u32(&wad_bytes[(offs + 0) ..(offs + 4)]) as usize;
+            let lump_start = utils::buf_to_u32(&wad_bytes[(offs + 0)..(offs + 4)]) as usize;
             let lump_size = utils::buf_to_u32(&wad_bytes[(offs + 4)..(offs + 8)]) as usize;
-            let lump_name = extract_lump_name(&wad_bytes[(offs + 8) .. (offs + 16)], lump_idx)?.to_string();
+            let lump_name = extract_lump_name(&wad_bytes[(offs + 8)..(offs + 16)], lump_idx)?.to_string();
             let lump_end = lump_start + lump_size;
             if lump_end >= wad_len {
                 return Err(format!("Lump {lump_name} too big: its end goes beyond the WAD"));
@@ -123,7 +133,7 @@ impl WadData {
                 "PLAYPAL" => {
                     self.pal.init_palettes(&lump_bytes);
                     self.font.compute_grayscale(&lump_bytes);
-                },
+                }
                 "COLORMAP" => self.pal.init_colormaps(&lump_bytes),
                 "PNAMES" => self.gfx.set_patch_names(&lump_bytes)?,
                 "F_START" => is_flats = true,

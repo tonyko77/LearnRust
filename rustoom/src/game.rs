@@ -7,9 +7,7 @@ TODO:
     - doc comments !!
  */
 
-use crate::map::*;
 use crate::utils::lump_name_from_hash;
-use crate::wad::*;
 use crate::*;
 use crate::{GraphicsLoop, Painter};
 use sdl2::event::Event;
@@ -18,7 +16,7 @@ use sdl2::keyboard::Keycode;
 pub struct DoomGame {
     wad_data: WadData,
     map_idx: usize,
-    map: MapData,
+    map: LevelMap,
     _x_mode: i32,
     _x_idx: usize,
     _sprite_key: u64,
@@ -29,10 +27,11 @@ pub struct DoomGame {
 
 impl DoomGame {
     pub fn new(wad_data: WadData) -> Result<DoomGame, String> {
+        let map = wad_data.load_map(0);
         let mut engine = DoomGame {
             wad_data,
-            map_idx: 9999,
-            map: MapData::new(""),
+            map_idx: 0,
+            map,
             _x_mode: 0,
             _x_idx: 0,
             _sprite_key: 0,
@@ -47,7 +46,7 @@ impl DoomGame {
     pub fn load_map(&mut self, idx: usize) {
         if self.map_idx != idx && idx < self.wad_data.map_count() {
             self.map_idx = idx;
-            self.map = self.wad_data.map(idx).clone();
+            self.map = self.wad_data.load_map(idx);
         }
     }
 

@@ -47,43 +47,44 @@ impl BspTree {
 pub struct BspNode {
     vect_orig: Vertex,
     vect_dir: Vertex,
-    right_box_tl: Vertex,
-    right_box_br: Vertex,
-    left_box_tl: Vertex,
-    left_box_br: Vertex,
+    right_box_tr: Vertex,
+    right_box_bl: Vertex,
+    left_box_tr: Vertex,
+    left_box_bl: Vertex,
     right_child: u16,
     left_child: u16,
 }
 
 impl BspNode {
-    // TODO replace this parsing with getters, which access the bytes directly :)
+    // TODO (?!?!?!?) replace this parsing with getters, which access the bytes directly
     // (+ same idea for all other structures: just get data directly from bytes)
     // + buf_to_extended_int, which converts i16 to "extended" i32 (left-shifted by 16)
     fn from_buf(buf: &[u8]) -> Self {
+        let vect = buf_to_i16_vect(&buf[0..24]);
         Self {
             vect_orig: Vertex {
-                x: buf_to_i16(&buf[0..2]) as i32,
-                y: buf_to_i16(&buf[2..4]) as i32,
+                x: vect[0] as i32,
+                y: vect[1] as i32,
             },
             vect_dir: Vertex {
-                x: buf_to_i16(&buf[4..6]) as i32,
-                y: buf_to_i16(&buf[6..8]) as i32,
+                x: vect[2] as i32,
+                y: vect[3] as i32,
             },
-            right_box_tl: Vertex {
-                x: buf_to_i16(&buf[12..14]) as i32,
-                y: buf_to_i16(&buf[8..10]) as i32,
+            right_box_bl: Vertex {
+                x: Ord::min(vect[6], vect[7]) as i32,
+                y: Ord::min(vect[4], vect[5]) as i32,
             },
-            right_box_br: Vertex {
-                x: buf_to_i16(&buf[14..16]) as i32,
-                y: buf_to_i16(&buf[10..12]) as i32,
+            right_box_tr: Vertex {
+                x: Ord::max(vect[6], vect[7]) as i32,
+                y: Ord::max(vect[4], vect[5]) as i32,
             },
-            left_box_tl: Vertex {
-                x: buf_to_i16(&buf[20..22]) as i32,
-                y: buf_to_i16(&buf[16..18]) as i32,
+            left_box_bl: Vertex {
+                x: Ord::min(vect[10], vect[11]) as i32,
+                y: Ord::min(vect[8], vect[9]) as i32,
             },
-            left_box_br: Vertex {
-                x: buf_to_i16(&buf[22..24]) as i32,
-                y: buf_to_i16(&buf[18..20]) as i32,
+            left_box_tr: Vertex {
+                x: Ord::max(vect[10], vect[11]) as i32,
+                y: Ord::max(vect[8], vect[9]) as i32,
             },
             right_child: buf_to_u16(&buf[24..26]),
             left_child: buf_to_u16(&buf[26..28]),
