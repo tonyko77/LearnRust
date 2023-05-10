@@ -111,17 +111,30 @@ impl DoomGame {
 
     fn paint_bsp(&self, painter: &mut dyn Painter) {
         self.map.paint_automap(painter, self.wad_data.font());
+
+        // paint the player's boxes
+        let plpos = self.map.get_player().pos();
+        let nodes = self.map.bsp().seek_player(&plpos);
+        let mut gray_lev = 255;
+        for n in nodes {
+            let col_left = RGB::from(gray_lev, 0, gray_lev);
+            let col_right = RGB::from(0, gray_lev, 0);
+            self.paint_rect(painter, &n.left_box_bl, &n.left_box_tr, col_left);
+            self.paint_rect(painter, &n.right_box_bl, &n.right_box_tr, col_right);
+            if gray_lev < 20 {
+                break;
+            }
+            gray_lev -= 20;
+        }
+
         // get the bsp node
         let idx = self._bsp_node_idx;
         let node = self.map.bsp().get_node(idx);
         // paint left rect
-        let vlb = self.map.translate_automap_vertex(node.left_box_bl, painter);
-        let vrt = self.map.translate_automap_vertex(node.left_box_tr, painter);
-        painter.draw_rect(vlb.x, vrt.y, vrt.x - vlb.x + 1, vlb.y - vrt.y + 1, PINK);
-        // paint right
-        let vlb = self.map.translate_automap_vertex(node.right_box_bl, painter);
-        let vrt = self.map.translate_automap_vertex(node.right_box_tr, painter);
-        painter.draw_rect(vlb.x, vrt.y, vrt.x - vlb.x + 1, vlb.y - vrt.y + 1, GREEN);
+        self.paint_rect(painter, &node.left_box_bl, &node.left_box_tr, PINK);
+        // paint right rect
+        self.paint_rect(painter, &node.right_box_bl, &node.right_box_tr, GREEN);
+
         // paint dividing vector
         let ov = self.map.translate_automap_vertex(node.vect_orig, painter);
         let fff = node.vect_dir.add(&node.vect_orig);
@@ -131,6 +144,16 @@ impl DoomGame {
 
         let text = format!("BSP node {idx} / {}", self.map.bsp().get_node_count());
         self.wad_data.font().draw_text(3, 15, &text, WHITE, painter);
+    }
+
+    fn paint_rect(&self, painter: &mut dyn Painter, v1: &Vertex, v2: &Vertex, color: RGB) {
+        let tv1 = self.map.translate_automap_vertex(*v1, painter);
+        let tv2 = self.map.translate_automap_vertex(*v2, painter);
+        let x1 = Ord::min(tv1.x, tv2.x);
+        let y1 = Ord::min(tv1.y, tv2.y);
+        let x2 = Ord::max(tv1.x, tv2.x);
+        let y2 = Ord::max(tv1.y, tv2.y);
+        painter.draw_rect(x1, y1, x2 - x1 + 1, y2 - y1 + 1, color);
     }
 
     fn bsp_move(&mut self, go_right: bool) {

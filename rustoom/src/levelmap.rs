@@ -53,7 +53,7 @@ impl LevelMap {
             panic!("No player found in map's THINGS");
         }
         // TODO map.build_bsp();
-        map.bsp.set_nodes(map_data.nodes());
+        map.bsp.set_nodes_lump(map_data.nodes());
         map
     }
 
