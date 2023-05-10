@@ -8,9 +8,9 @@
 
 use rustoom::*;
 
-const SCR_WIDTH: i32 = 480;
-const SCR_HEIGHT: i32 = 360;
-const PIXEL_SIZE: i32 = 2;
+const SCR_WIDTH: i32 = 400;
+const SCR_HEIGHT: i32 = 300;
+const PIXEL_SIZE: i32 = 3;
 
 const SLEEP_KIND: SleepKind = SleepKind::YIELD;
 

@@ -17,13 +17,13 @@ const LINE_NEVER_ON_AMAP: u16 = 0x0080;
 const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
 // Automap zoom limits
-const DEFAULT_AUTOMAP_ZOOM: i32 = 12;
+const DEFAULT_AUTOMAP_ZOOM: i32 = 7;
 const AUTOMAP_ZOOM_MIN: i32 = 5;
 const AUTOMAP_ZOOM_MAX: i32 = 60;
 
 pub struct LevelMap {
     map_data: MapData,
-    // TODO bsp: BspTree,
+    bsp: BspTree,
     player: Thing,
     amap_center: Vertex,
     amap_bl: Vertex,
@@ -32,10 +32,10 @@ pub struct LevelMap {
 }
 
 impl LevelMap {
-    pub fn new(map: &MapData) -> Self {
+    pub fn new(map_data: &MapData) -> Self {
         let mut map = Self {
-            map_data: map.clone(),
-            // TODO bsp: BspTree::new(),
+            map_data: map_data.clone(),
+            bsp: BspTree::new(),
             player: Default::default(),
             amap_center: Vertex { x: 0, y: 0 },
             amap_bl: Vertex { x: 0, y: 0 },
@@ -53,7 +53,13 @@ impl LevelMap {
             panic!("No player found in map's THINGS");
         }
         // TODO map.build_bsp();
+        map.bsp.set_nodes(map_data.nodes());
         map
+    }
+
+    // TODO TEMP method !!!
+    pub fn bsp(&self) -> &BspTree {
+        &self.bsp
     }
 
     #[inline]
@@ -131,7 +137,8 @@ impl LevelMap {
     // private methods
     //---------------
 
-    fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> (i32, i32) {
+    // TODO temporary public
+    pub fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> (i32, i32) {
         // scale the original coordinates
         let xs = ((orig_vertex.x - self.amap_center.x) as i32) * self.amap_zoom / 100;
         let ys = ((orig_vertex.y - self.amap_center.y) as i32) * self.amap_zoom / 100;

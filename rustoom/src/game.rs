@@ -23,6 +23,7 @@ pub struct DoomGame {
     _sprite_gfx: PixMap,
     _tex_gfx: Texture,
     _pink_outline: bool,
+    _bsp_node_idx: usize,
 }
 
 impl DoomGame {
@@ -30,7 +31,7 @@ impl DoomGame {
         let map = wad_data.load_map(0);
         let mut engine = DoomGame {
             wad_data,
-            map_idx: 0,
+            map_idx: 9999,
             map,
             _x_mode: 0,
             _x_idx: 0,
@@ -38,7 +39,9 @@ impl DoomGame {
             _sprite_gfx: PixMap::new_empty(),
             _tex_gfx: Texture::new(0, 0, 0),
             _pink_outline: false,
+            _bsp_node_idx: 0,
         };
+        engine.load_map(0);
         engine.update_state(0.0);
         Ok(engine)
     }
@@ -47,26 +50,33 @@ impl DoomGame {
         if self.map_idx != idx && idx < self.wad_data.map_count() {
             self.map_idx = idx;
             self.map = self.wad_data.load_map(idx);
+            self._bsp_node_idx = self.map.bsp().get_node_count() - 1;
         }
     }
 
     //----------------
 
     fn paint_graphics(&self, painter: &mut dyn Painter, hdr: &str, text_color: RGB) {
-        const CC: i32 = 120;
+        const CC: u16 = 140;
+        let bad_width =
+            ((self._sprite_gfx.width() + CC) as i32) + self._sprite_gfx.x_offset() > painter.get_screen_width();
+        let bad_height =
+            ((self._sprite_gfx.height() + CC) as i32) + self._sprite_gfx.y_offset() > painter.get_screen_height();
+        let xyc = if bad_width || bad_height { CC / 3 } else { CC } as i32;
+
         // draw center lines
         let sw = painter.get_screen_width();
         let sh = painter.get_screen_height();
-        painter.draw_horiz_line(0, sw, CC, VERY_DARK_GREY);
-        painter.draw_vert_line(CC, 0, sh, VERY_DARK_GREY);
+        painter.draw_horiz_line(0, sw, xyc, VERY_DARK_GREY);
+        painter.draw_vert_line(xyc, 0, sh, VERY_DARK_GREY);
 
         // draw sprite
-        self._sprite_gfx.paint(CC, CC, painter, self.wad_data.palette());
+        self._sprite_gfx.paint(xyc, xyc, painter, self.wad_data.palette());
         // draw rectangle around the sprite
         let (w, h) = (self._sprite_gfx.width() as i32, self._sprite_gfx.height() as i32);
         if self._pink_outline {
-            let xo = CC - 1 + self._sprite_gfx.x_offset();
-            let yo = CC - 1 + self._sprite_gfx.y_offset();
+            let xo = xyc - 1 + self._sprite_gfx.x_offset();
+            let yo = xyc - 1 + self._sprite_gfx.y_offset();
             painter.draw_rect(xo, yo, w + 2, h + 2, PINK);
         }
 
@@ -99,6 +109,40 @@ impl DoomGame {
         self.wad_data.font().draw_text(3, 3, &text, text_color, painter);
     }
 
+    fn paint_bsp(&self, painter: &mut dyn Painter) {
+        self.map.paint_automap(painter, self.wad_data.font());
+        // get the bsp node
+        let idx = self._bsp_node_idx;
+        let node = self.map.bsp().get_node(idx);
+        // paint left rect
+        let (l, b) = self.map.translate_automap_vertex(node.left_box_bl, painter);
+        let (r, t) = self.map.translate_automap_vertex(node.left_box_tr, painter);
+        painter.draw_rect(l, t, r - l + 1, b - t + 1, YELLOW);
+        // paint right
+        let (l, b) = self.map.translate_automap_vertex(node.right_box_bl, painter);
+        let (r, t) = self.map.translate_automap_vertex(node.right_box_tr, painter);
+        painter.draw_rect(l, t, r - l + 1, b - t + 1, BLUE);
+        // paint dividing vector
+        let (ox, oy) = self.map.translate_automap_vertex(node.vect_orig, painter);
+        let (dx, dy) = self.map.translate_automap_vertex(node.vect_dir, painter);
+        painter.draw_line(ox, oy, dx, dy, PINK);
+        painter.fill_circle(dx, dy, 1, PINK);
+
+        let text = format!("BSP node {idx} / {}", self.map.bsp().get_node_count());
+        self.wad_data.font().draw_text(3, 15, &text, PINK, painter);
+    }
+
+    fn bsp_move(&mut self, go_right: bool) {
+        let idx = self._bsp_node_idx;
+        let node = self.map.bsp().get_node(idx);
+        let next = if go_right { node.right_child } else { node.left_child };
+        self._bsp_node_idx = if (next & 0x8000) == 0 {
+            next as usize
+        } else {
+            self.map.bsp().get_node_count() - 1
+        };
+    }
+
     fn handle_key_down(&mut self, key: &Keycode) {
         match key {
             Keycode::KpPlus => {
@@ -106,6 +150,12 @@ impl DoomGame {
             }
             Keycode::KpMinus => {
                 self.map.zoom_automap(-1);
+            }
+            Keycode::KpDivide => {
+                self.bsp_move(false);
+            }
+            Keycode::KpMultiply => {
+                self.bsp_move(true);
             }
             Keycode::Left => {
                 self.map.move_automap(-50, 0);
@@ -120,21 +170,16 @@ impl DoomGame {
                 self.map.move_automap(0, -50);
             }
             Keycode::PageUp => {
-                if self._x_idx > 0 {
-                    self._x_idx -= 1;
-                }
+                self._x_idx = self._x_idx.wrapping_sub(1);
             }
             Keycode::PageDown => {
-                if self._x_idx < usize::MAX {
-                    self._x_idx += 1;
-                }
+                self._x_idx = self._x_idx.wrapping_add(1);
             }
             Keycode::Home => {
                 self._x_idx = 0;
             }
             Keycode::End => {
-                self._x_mode = (self._x_mode + 1) & 0x03;
-                self._x_idx = 0;
+                self._x_mode += 1;
             }
             Keycode::Insert => {
                 self._pink_outline = !self._pink_outline;
@@ -166,11 +211,11 @@ impl GraphicsLoop for DoomGame {
     fn update_state(&mut self, _elapsed_time: f64) -> bool {
         // update map
         match self._x_mode {
-            0 => {
+            0 | 1 => {
                 let midx = self._x_idx % self.wad_data.map_count();
                 self.load_map(midx);
             }
-            1 => {
+            2 => {
                 let keys = self.wad_data.graphics().dbg_patch_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
@@ -181,7 +226,7 @@ impl GraphicsLoop for DoomGame {
                     .expect(format!("texture not found: {kidx} >= {}", keys.len()).as_str());
                 self._sprite_key = k;
             }
-            2 => {
+            3 => {
                 let keys = self.wad_data.graphics().dbg_flat_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
@@ -192,7 +237,7 @@ impl GraphicsLoop for DoomGame {
                     .expect(format!("texture not found: {kidx} >= {}", keys.len()).as_str());
                 self._sprite_key = k;
             }
-            3 => {
+            4 => {
                 let keys = self.wad_data.graphics().dbg_texture_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
@@ -215,9 +260,11 @@ impl GraphicsLoop for DoomGame {
     fn paint(&self, painter: &mut dyn Painter) {
         painter.fill_rect(0, 0, painter.get_screen_width(), painter.get_screen_height(), BLACK);
         match self._x_mode {
-            1 => self.paint_graphics(painter, "PATCH", YELLOW),
-            2 => self.paint_graphics(painter, "FLAT", CYAN),
-            3 => self.paint_texture(painter, "TEXTURE", WHITE),
+            0 => self.map.paint_automap(painter, self.wad_data.font()),
+            1 => self.paint_bsp(painter),
+            2 => self.paint_graphics(painter, "PATCH", YELLOW),
+            3 => self.paint_graphics(painter, "FLAT", CYAN),
+            4 => self.paint_texture(painter, "TEXTURE", WHITE),
             _ => self.map.paint_automap(painter, self.wad_data.font()),
         }
     }

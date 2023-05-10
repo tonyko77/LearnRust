@@ -44,15 +44,16 @@ impl BspTree {
 
 //----------------------------
 
+// TODO temp pub
 pub struct BspNode {
-    vect_orig: Vertex,
-    vect_dir: Vertex,
-    right_box_tr: Vertex,
-    right_box_bl: Vertex,
-    left_box_tr: Vertex,
-    left_box_bl: Vertex,
-    right_child: u16,
-    left_child: u16,
+    pub vect_orig: Vertex,
+    pub vect_dir: Vertex,
+    pub right_box_tr: Vertex,
+    pub right_box_bl: Vertex,
+    pub left_box_tr: Vertex,
+    pub left_box_bl: Vertex,
+    pub right_child: u16,
+    pub left_child: u16,
 }
 
 impl BspNode {
@@ -67,8 +68,9 @@ impl BspNode {
                 y: vect[1] as i32,
             },
             vect_dir: Vertex {
-                x: vect[2] as i32,
-                y: vect[3] as i32,
+                // FIX: direction is a delta (TODO maybe I should leave it as is ?)
+                x: (vect[2] + vect[0]) as i32,
+                y: (vect[3] + vect[1]) as i32,
             },
             right_box_bl: Vertex {
                 x: Ord::min(vect[6], vect[7]) as i32,
