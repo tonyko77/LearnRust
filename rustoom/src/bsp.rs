@@ -68,9 +68,8 @@ impl BspNode {
                 y: vect[1] as i32,
             },
             vect_dir: Vertex {
-                // FIX: direction is a delta (TODO maybe I should leave it as is ?)
-                x: (vect[2] + vect[0]) as i32,
-                y: (vect[3] + vect[1]) as i32,
+                x: vect[2] as i32,
+                y: vect[3] as i32,
             },
             right_box_bl: Vertex {
                 x: Ord::min(vect[6], vect[7]) as i32,

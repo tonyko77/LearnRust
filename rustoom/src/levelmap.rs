@@ -86,8 +86,8 @@ impl LevelMap {
     pub fn paint_automap(&self, painter: &mut dyn Painter, font: &Font) {
         for idx in 0..self.line_count() {
             let line = self.linedef(idx);
-            let (x1, y1) = self.translate_automap_vertex(line.v1, painter);
-            let (x2, y2) = self.translate_automap_vertex(line.v2, painter);
+            let v1 = self.translate_automap_vertex(line.v1, painter);
+            let v2 = self.translate_automap_vertex(line.v2, painter);
 
             // select color based on line type
             let f = line.flags;
@@ -105,7 +105,7 @@ impl LevelMap {
             } else {
                 MAGENTA
             };
-            painter.draw_line(x1, y1, x2, y2, color);
+            painter.draw_line(v1.x, v1.y, v2.x, v2.y, color);
         }
         // draw the things
         for thing in self.get_things(0) {
@@ -137,21 +137,20 @@ impl LevelMap {
     // private methods
     //---------------
 
-    // TODO temporary public
-    pub fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> (i32, i32) {
+    pub fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> Vertex {
         // scale the original coordinates
-        let xs = ((orig_vertex.x - self.amap_center.x) as i32) * self.amap_zoom / 100;
-        let ys = ((orig_vertex.y - self.amap_center.y) as i32) * self.amap_zoom / 100;
+        let sv = orig_vertex.sub(&self.amap_center).scale(self.amap_zoom, 100);
         // translate the scaled coordinates + mirror y
-        let xt = xs + (painter.get_screen_width() / 2);
-        let yt = (painter.get_screen_height() / 2) - ys;
-        (xt, yt)
+        Vertex {
+            x: sv.x + (painter.get_screen_width() / 2),
+            y: (painter.get_screen_height() / 2) - sv.y,
+        }
     }
 
     fn paint_cross(&self, painter: &mut dyn Painter, v: Vertex, color: RGB) {
-        let (x, y) = self.translate_automap_vertex(v, painter);
-        painter.draw_line(x - 1, y, x + 1, y, color);
-        painter.draw_line(x, y - 1, x, y + 1, color);
+        let v = self.translate_automap_vertex(v, painter);
+        painter.draw_line(v.x - 1, v.y, v.x + 1, v.y, color);
+        painter.draw_line(v.x, v.y - 1, v.x, v.y + 1, color);
     }
 
     #[inline]

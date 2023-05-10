@@ -115,21 +115,22 @@ impl DoomGame {
         let idx = self._bsp_node_idx;
         let node = self.map.bsp().get_node(idx);
         // paint left rect
-        let (l, b) = self.map.translate_automap_vertex(node.left_box_bl, painter);
-        let (r, t) = self.map.translate_automap_vertex(node.left_box_tr, painter);
-        painter.draw_rect(l, t, r - l + 1, b - t + 1, YELLOW);
+        let vlb = self.map.translate_automap_vertex(node.left_box_bl, painter);
+        let vrt = self.map.translate_automap_vertex(node.left_box_tr, painter);
+        painter.draw_rect(vlb.x, vrt.y, vrt.x - vlb.x + 1, vlb.y - vrt.y + 1, PINK);
         // paint right
-        let (l, b) = self.map.translate_automap_vertex(node.right_box_bl, painter);
-        let (r, t) = self.map.translate_automap_vertex(node.right_box_tr, painter);
-        painter.draw_rect(l, t, r - l + 1, b - t + 1, BLUE);
+        let vlb = self.map.translate_automap_vertex(node.right_box_bl, painter);
+        let vrt = self.map.translate_automap_vertex(node.right_box_tr, painter);
+        painter.draw_rect(vlb.x, vrt.y, vrt.x - vlb.x + 1, vlb.y - vrt.y + 1, GREEN);
         // paint dividing vector
-        let (ox, oy) = self.map.translate_automap_vertex(node.vect_orig, painter);
-        let (dx, dy) = self.map.translate_automap_vertex(node.vect_dir, painter);
-        painter.draw_line(ox, oy, dx, dy, PINK);
-        painter.fill_circle(dx, dy, 1, PINK);
+        let ov = self.map.translate_automap_vertex(node.vect_orig, painter);
+        let fff = node.vect_dir.add(&node.vect_orig);
+        let dv = self.map.translate_automap_vertex(fff, painter);
+        painter.draw_line(ov.x, ov.y, dv.x, dv.y, WHITE);
+        painter.fill_circle(dv.x, dv.y, 1, WHITE);
 
         let text = format!("BSP node {idx} / {}", self.map.bsp().get_node_count());
-        self.wad_data.font().draw_text(3, 15, &text, PINK, painter);
+        self.wad_data.font().draw_text(3, 15, &text, WHITE, painter);
     }
 
     fn bsp_move(&mut self, go_right: bool) {
@@ -211,11 +212,11 @@ impl GraphicsLoop for DoomGame {
     fn update_state(&mut self, _elapsed_time: f64) -> bool {
         // update map
         match self._x_mode {
-            0 | 1 => {
+            0 => {
                 let midx = self._x_idx % self.wad_data.map_count();
                 self.load_map(midx);
             }
-            2 => {
+            1 => {
                 let keys = self.wad_data.graphics().dbg_patch_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
@@ -226,7 +227,7 @@ impl GraphicsLoop for DoomGame {
                     .expect(format!("texture not found: {kidx} >= {}", keys.len()).as_str());
                 self._sprite_key = k;
             }
-            3 => {
+            2 => {
                 let keys = self.wad_data.graphics().dbg_flat_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
@@ -237,7 +238,7 @@ impl GraphicsLoop for DoomGame {
                     .expect(format!("texture not found: {kidx} >= {}", keys.len()).as_str());
                 self._sprite_key = k;
             }
-            4 => {
+            3 => {
                 let keys = self.wad_data.graphics().dbg_texture_keys();
                 let kidx = self._x_idx % keys.len();
                 let k = keys[kidx];
@@ -260,12 +261,11 @@ impl GraphicsLoop for DoomGame {
     fn paint(&self, painter: &mut dyn Painter) {
         painter.fill_rect(0, 0, painter.get_screen_width(), painter.get_screen_height(), BLACK);
         match self._x_mode {
-            0 => self.map.paint_automap(painter, self.wad_data.font()),
-            1 => self.paint_bsp(painter),
-            2 => self.paint_graphics(painter, "PATCH", YELLOW),
-            3 => self.paint_graphics(painter, "FLAT", CYAN),
-            4 => self.paint_texture(painter, "TEXTURE", WHITE),
-            _ => self.map.paint_automap(painter, self.wad_data.font()),
+            0 => self.paint_bsp(painter),
+            1 => self.paint_graphics(painter, "PATCH", YELLOW),
+            2 => self.paint_graphics(painter, "FLAT", CYAN),
+            3 => self.paint_texture(painter, "TEXTURE", WHITE),
+            _ => {}
         }
     }
 }

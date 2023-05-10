@@ -52,3 +52,29 @@ pub struct Vertex {
     pub x: i32,
     pub y: i32,
 }
+
+impl Vertex {
+    #[inline]
+    pub fn add(&self, other: &Vertex) -> Vertex {
+        Vertex {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+
+    #[inline]
+    pub fn sub(&self, other: &Vertex) -> Vertex {
+        Vertex {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+
+    #[inline]
+    pub fn scale(&self, mul: i32, div: i32) -> Vertex {
+        Vertex {
+            x: self.x * mul / div,
+            y: self.y * mul / div,
+        }
+    }
+}
