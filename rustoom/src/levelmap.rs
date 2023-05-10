@@ -1,104 +1,21 @@
-//! Parse and build maps from the WAD.
+//! An "active" level map, where all the map data is expanded and "mutable".
+//! Built from an existing MapData.
 
+use crate::bsp::*;
 use crate::utils::*;
 use crate::*;
 use bytes::Bytes;
 
-// Indexes for various MapData lumps
-const IDX_THINGS: usize = 0;
-const IDX_LINEDEFS: usize = 1;
-const IDX_SIDEDEFS: usize = 2;
-const IDX_VERTEXES: usize = 3;
-const IDX_SEGS: usize = 4;
-const IDX_SSECTORS: usize = 5;
-const IDX_NODES: usize = 6;
-const IDX_SECTORS: usize = 7;
-const IDX_REJECT: usize = 8;
-const IDX_BLOCKMAP: usize = 9;
-const LUMP_CNT: usize = 10;
-
-// LineDef flags
-const LINE_BLOCKS: u16 = 0x0001;
-//const LINE_BLOCKS_MONSTERS: u16 = 0x0002;
-const LINE_TWO_SIDED: u16 = 0x0004;
-//const LINE_UPPER_UNPEGGED: u16 = 0x0008;
-//const LINE_LOWER_UNPEGGED: u16 = 0x0010;
-const LINE_SECRET: u16 = 0x0020;
-//const LINE_BLOCKS_SND: u16 = 0x0040;
-const LINE_NEVER_ON_AMAP: u16 = 0x0080;
-const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
-
-// Automap zoom limits
-const DEFAULT_AUTOMAP_ZOOM: i32 = 12;
-const AUTOMAP_ZOOM_MIN: i32 = 5;
-const AUTOMAP_ZOOM_MAX: i32 = 60;
-
-pub struct MapData {
+pub struct LevelMap {
     name: String,
-    lumps: Box<[Bytes; LUMP_CNT]>,
-    amap_zoom: i32,
-    amap_center: Vertex,
+    vertexes: Bytes,
+    linedefs: Bytes,
+    sidedefs: Bytes,
+    things: Bytes,
     bsp: BspTree,
 }
 
-// TODO !!! MapData will be just a immutable data holder; move all the "live" functionality to LevelMap !!
-impl Clone for MapData {
-    fn clone(&self) -> Self {
-        let lumps: Box<[Bytes; LUMP_CNT]> = Box::new((*self.lumps).clone());
-        Self {
-            name: self.name.clone(),
-            lumps,
-            amap_zoom: self.amap_zoom,
-            amap_center: self.amap_center.clone(),
-            bsp: self.bsp.clone(),
-        }
-    }
-}
-
-impl MapData {
-    pub fn new(name: &str) -> Self {
-        let lumps: Box<[Bytes; LUMP_CNT]> = Box::new(Default::default());
-        Self {
-            name: name.to_string(),
-            lumps,
-            amap_zoom: DEFAULT_AUTOMAP_ZOOM,
-            amap_center: Vertex { x: 0, y: 0 },
-            bsp: BspTree::new(),
-        }
-    }
-
-    pub fn add_lump(&mut self, lump: &str, bytes: &Bytes) -> bool {
-        let idx = match lump {
-            "VERTEXES" => IDX_VERTEXES,
-            "LINEDEFS" => IDX_LINEDEFS,
-            "THINGS" => IDX_THINGS,
-            "SIDEDEFS" => IDX_SIDEDEFS,
-            "SEGS" => IDX_SEGS,
-            "SSECTORS" => IDX_SSECTORS,
-            "NODES" => {
-                self.bsp.set_nodes(bytes);
-                IDX_NODES
-            }
-            "SECTORS" => IDX_SECTORS,
-            "REJECT" => IDX_REJECT,
-            "BLOCKMAP" => IDX_BLOCKMAP,
-            _ => usize::MAX,
-        };
-        // check if it was a valid lump; if not => return false, to signal the end of the map lumps
-        // (all the lumps of one map are consecutive, so if we get an invalid one => we're done with this map)
-        if idx < LUMP_CNT {
-            self.do_add_lump(idx, bytes.clone());
-            true
-        } else {
-            false
-        }
-    }
-
-    #[inline]
-    pub fn is_complete(&self) -> bool {
-        self.lumps.iter().all(|b| b.len() > 0)
-    }
-
+impl LevelMap {
     #[inline]
     pub fn name(&self) -> &str {
         &self.name
@@ -118,16 +35,6 @@ impl MapData {
             .map(|idx| self.thing(idx))
             .find(|th| th.type_code() == 1)
             .expect("Player not found in map's THINGS")
-    }
-
-    pub fn move_automap(&mut self, dx: i32, dy: i32) {
-        self.amap_center.x += dx;
-        self.amap_center.y += dy;
-    }
-
-    pub fn zoom_automap(&mut self, dzoom: i32) {
-        let new_zoom = self.amap_zoom + dzoom;
-        self.amap_zoom = new_zoom.max(AUTOMAP_ZOOM_MIN).min(AUTOMAP_ZOOM_MAX);
     }
 
     pub fn paint_automap(&self, painter: &mut dyn Painter, font: &Font) {
@@ -236,14 +143,16 @@ impl MapData {
 
     #[inline]
     fn thing_count(&self) -> usize {
-        self.lumps[IDX_THINGS].len() / 10
+        self.things.len() / 10
     }
 
     fn thing(&self, idx: usize) -> Thing {
-        let bytes = &self.lumps[IDX_THINGS];
-        Thing::new(&bytes[(idx * 10)..(idx * 10 + 10)])
+        Thing::new(&self.things[(idx * 10)..(idx * 10 + 10)])
     }
 }
+
+//--------------------
+//  Internal stuff
 
 #[derive(Debug)]
 struct LineDef {

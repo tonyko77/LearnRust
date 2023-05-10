@@ -1,8 +1,10 @@
 //! Main lib for the RustooM Doom-like engine/demo
 
+mod bsp;
 mod font;
 mod game;
 mod graphics;
+// TODO!!! mod levelmap;
 mod map;
 mod painter;
 mod palette;
@@ -12,9 +14,11 @@ mod things;
 mod utils;
 mod wad;
 
+pub use bsp::*;
 pub use font::*;
 pub use game::*;
 pub use graphics::*;
+// TODO!!! pub use levelmap::*;
 pub use map::*;
 pub use painter::*;
 pub use palette::*;
@@ -42,3 +46,10 @@ pub const BROWN: RGB = RGB { r: 160, g: 80, b: 0 };
 pub const CHOCO: RGB = RGB { r: 192, g: 128, b: 64 };
 pub const ORANGE: RGB = RGB { r: 255, g: 128, b: 0 };
 pub const PINK: RGB = RGB { r: 255, g: 0, b: 255 };
+
+/// Helpful structure, for vertexes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct Vertex {
+    pub x: i32,
+    pub y: i32,
+}
