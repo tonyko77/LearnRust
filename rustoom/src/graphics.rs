@@ -10,10 +10,6 @@ pub struct Graphics {
     flats: HashMap<u64, Bytes>,
     pnames: Bytes,
     textures: HashMap<u64, Bytes>,
-    // TODO delete these later
-    dbg_patch_keys: Vec<u64>,
-    dbg_flat_keys: Vec<u64>,
-    dbg_tex_keys: Vec<u64>,
 }
 
 impl Graphics {
@@ -23,35 +19,17 @@ impl Graphics {
             flats: HashMap::new(),
             pnames: Bytes::new(),
             textures: HashMap::new(),
-            // TODO delete these later
-            dbg_patch_keys: vec![],
-            dbg_flat_keys: vec![],
-            dbg_tex_keys: vec![],
         }
-    }
-
-    pub fn dbg_patch_keys(&self) -> &Vec<u64> {
-        &self.dbg_patch_keys
-    }
-
-    pub fn dbg_flat_keys(&self) -> &Vec<u64> {
-        &self.dbg_flat_keys
-    }
-
-    pub fn dbg_texture_keys(&self) -> &Vec<u64> {
-        &self.dbg_tex_keys
     }
 
     pub fn add_patch(&mut self, name: &str, lump: &Bytes) {
         let key = hash_lump_name(name.as_bytes());
         self.patches.insert(key, lump.clone());
-        self.dbg_patch_keys.push(key); // TODO TEMP !!!
     }
 
     pub fn add_flat(&mut self, name: &str, lump: &Bytes) {
         let key = hash_lump_name(name.as_bytes());
         self.flats.insert(key, lump.clone());
-        self.dbg_flat_keys.push(key); // TODO TEMP !!!
     }
 
     pub fn set_patch_names(&mut self, patches: &Bytes) -> Result<(), String> {
@@ -91,7 +69,6 @@ impl Graphics {
             }
             let tex_bytes = bytes.slice(offs..offs + tex_len);
             self.textures.insert(key, tex_bytes);
-            self.dbg_tex_keys.push(key); // TODO TEMP !!!
         }
 
         Ok(())
@@ -120,7 +97,10 @@ impl Graphics {
             let patch_idx = buf_to_u16(&tex_bytes[(pofs + 4)..(pofs + 6)]) as usize;
             let name = std::str::from_utf8(&self.pnames[(patch_idx * 8 + 4)..(patch_idx * 8 + 12)]).unwrap();
             let patch_key = hash_lump_name(&self.pnames[(patch_idx * 8 + 4)..(patch_idx * 8 + 12)]);
-            let patch_bytes = self.patches.get(&patch_key).expect(format!("PATCH bytes not found: {name}").as_str());
+            let patch_bytes = self
+                .patches
+                .get(&patch_key)
+                .expect(format!("PATCH bytes not found: {name}").as_str());
             texture.add_patch(patch_bytes, x_orig, y_orig);
         }
         Some(texture)

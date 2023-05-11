@@ -68,20 +68,3 @@ pub fn atoi(s: &str) -> Option<u32> {
     }
     Some(num)
 }
-
-// the opposite of hash_lump_name -> just in case we want the name
-pub fn lump_name_from_hash(key: u64) -> String {
-    let mut bytes = Vec::with_capacity(8);
-    let mut key = key;
-    while key > 0 {
-        let b = (key & 0xFF) as u8;
-        let c = match b {
-            32..=126 => b,
-            _ => 63,
-        };
-        bytes.push(c);
-        key = key >> 8;
-    }
-    bytes.reverse();
-    String::from_utf8(bytes).unwrap()
-}

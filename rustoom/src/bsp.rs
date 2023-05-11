@@ -32,8 +32,7 @@ impl BspTree {
         }
     }
 
-    // TODO (later) replace Vec<Vec<Seg>> with Vec<Seg> - no reason to have a vector of vectors
-    pub fn locate_player(&self, player: &Thing) -> Vec<Vec<Seg>> {
+    pub fn locate_player(&self, player: &Thing) -> Vec<Seg> {
         let mut sect_collector = vec![];
         let start_idx = (self.node_count() - 1) as u16;
         self.render_node(player, start_idx, &mut sect_collector);
@@ -52,59 +51,54 @@ impl BspTree {
 
     //----------------------------
 
-    fn render_node(&self, player: &Thing, node_idx: u16, sect_collector: &mut Vec<Vec<Seg>>) {
+    fn render_node(&self, player: &Thing, node_idx: u16, seg_collector: &mut Vec<Seg>) {
         if (node_idx & SSECTOR_FLAG) == 0 {
             // NOT a leaf
             let node = self.node(node_idx as usize);
             let is_on_left = node.is_point_on_left(&player.pos());
             if is_on_left {
                 // traverse LEFT first
-                self.render_node(player, node.left_child, sect_collector);
-                if self.check_bounding_box(player, &node.right_box_bl, &node.right_box_tr) {
-                    self.render_node(player, node.right_child, sect_collector);
-                }
+                self.render_node(player, node.left_child, seg_collector);
+                // TODO? if self.check_bounding_box(player, &node.right_box_bl, &node.right_box_tr) {
+                self.render_node(player, node.right_child, seg_collector);
             } else {
                 // traverse RIGHT first
-                self.render_node(player, node.right_child, sect_collector);
-                if self.check_bounding_box(player, &node.left_box_bl, &node.left_box_tr) {
-                    self.render_node(player, node.left_child, sect_collector);
-                }
+                self.render_node(player, node.right_child, seg_collector);
+                // TODO? if self.check_bounding_box(player, &node.left_box_bl, &node.left_box_tr) {
+                self.render_node(player, node.left_child, seg_collector);
             }
         } else {
             // it's a LEAF => render sector
-            let sect = self.render_sub_sector(node_idx);
-            sect_collector.push(sect);
+            self.render_sub_sector(node_idx, seg_collector);
         }
     }
 
-    fn render_sub_sector(&self, sect_idx: u16) -> Vec<Seg> {
+    fn render_sub_sector(&self, sect_idx: u16, seg_collector: &mut Vec<Seg>) {
         let idx = (sect_idx & !SSECTOR_FLAG) as usize;
         // from SSECTORS, extract the seg count and first seg index
         let bytes = checked_slice(&self.map_data.ssectors(), idx, SSECTOR_SIZE);
-        let seg_count = buf_to_u16(&bytes[0..2]) as usize;
-        let first_seg_idx = buf_to_u16(&bytes[2..4]) as usize;
+        let seg_count = buf_to_u16(&bytes[0..2]);
+        let first_seg_idx = buf_to_u16(&bytes[2..4]);
         // from SEGS, extract each segment
-        let segs = (0..seg_count).map(|idx| self.seg(first_seg_idx + idx)).collect();
-        segs
+        for i in 0..seg_count {
+            self.render_seg(first_seg_idx + i, seg_collector);
+        }
     }
 
-    /// Check if some of the bounding box might be visible to the player
-    /// (to optimize drawing if it is not).
-    fn check_bounding_box(&self, _player: &Thing, _bl_bbox: &Vertex, _tr_bbox: &Vertex) -> bool {
-        // TODO (later) implement this
-        // see https://github.com/chocolate-doom/chocolate-doom/blob/master/src/doom/r_bsp.c#L380
-        true
+    fn render_seg(&self, seg_idx: u16, seg_collector: &mut Vec<Seg>) {
+        let idx = seg_idx as usize;
+        let bytes = checked_slice(&self.map_data.segs(), idx, SEG_SIZE);
+        let seg = Seg::from(bytes, &self.map_data);
+        seg_collector.push(seg);
     }
 
-    // TODO temp pub !!
     #[inline(always)]
-    pub fn node_count(&self) -> usize {
+    fn node_count(&self) -> usize {
         self.map_data.nodes().len() / 28
     }
 
-    // TODO temp pub !!
     #[inline(always)]
-    pub fn node(&self, idx: usize) -> BspNode {
+    fn node(&self, idx: usize) -> BspNode {
         let bytes = checked_slice(&self.map_data.nodes(), idx, NODE_SIZE);
         BspNode::from(bytes)
     }
@@ -118,16 +112,16 @@ impl BspTree {
 
 //----------------------------
 
-// TODO temp pub-s + pub struct !!
-pub struct BspNode {
-    pub vect_orig: Vertex,
-    pub vect_dir: Vertex,
-    pub right_box_tr: Vertex,
-    pub right_box_bl: Vertex,
-    pub left_box_tr: Vertex,
-    pub left_box_bl: Vertex,
-    pub right_child: u16,
-    pub left_child: u16,
+struct BspNode {
+    vect_orig: Vertex,
+    vect_dir: Vertex,
+    // TODO use bounding boxes to optimize drawing (not relly needed, but niiice)
+    _right_box_tr: Vertex,
+    _right_box_bl: Vertex,
+    _left_box_tr: Vertex,
+    _left_box_bl: Vertex,
+    right_child: u16,
+    left_child: u16,
 }
 
 // TODO if most data is not needed => just remove this struct,
@@ -144,23 +138,23 @@ impl BspNode {
                 x: vect[2] as i32,
                 y: vect[3] as i32,
             },
-            right_box_bl: Vertex {
-                // TODO is this needed ??
+            _right_box_bl: Vertex {
+                // TODO figure out the order of the vertices
                 x: Ord::min(vect[6], vect[7]) as i32,
                 y: Ord::min(vect[4], vect[5]) as i32,
             },
-            right_box_tr: Vertex {
-                // TODO is this needed ??
+            _right_box_tr: Vertex {
+                // TODO figure out the order of the vertices
                 x: Ord::max(vect[6], vect[7]) as i32,
                 y: Ord::max(vect[4], vect[5]) as i32,
             },
-            left_box_bl: Vertex {
-                // TODO is this needed ??
+            _left_box_bl: Vertex {
+                // TODO figure out the order of the vertices
                 x: Ord::min(vect[10], vect[11]) as i32,
                 y: Ord::min(vect[8], vect[9]) as i32,
             },
-            left_box_tr: Vertex {
-                // TODO is this needed ??
+            _left_box_tr: Vertex {
+                // TODO figure out the order of the vertices
                 x: Ord::max(vect[10], vect[11]) as i32,
                 y: Ord::max(vect[8], vect[9]) as i32,
             },
@@ -177,7 +171,7 @@ impl BspNode {
     }
 }
 
-// TODO temp pub-s + pub struct !!
+// TODO temp pub-s !!
 pub struct Seg {
     pub start: Vertex,
     pub end: Vertex,
