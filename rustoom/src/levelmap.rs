@@ -35,7 +35,7 @@ impl LevelMap {
     pub fn new(map_data: &MapData) -> Self {
         let mut map = Self {
             map_data: map_data.clone(),
-            bsp: BspTree::new(),
+            bsp: BspTree::new(map_data),
             player: Default::default(),
             amap_center: Vertex { x: 0, y: 0 },
             amap_bl: Vertex { x: 0, y: 0 },
@@ -53,7 +53,6 @@ impl LevelMap {
             panic!("No player found in map's THINGS");
         }
         // TODO map.build_bsp();
-        map.bsp.set_nodes_lump(map_data.nodes());
         map
     }
 
@@ -154,20 +153,6 @@ impl LevelMap {
     }
 
     #[inline]
-    fn vertex_count(&self) -> usize {
-        self.map_data.vertexes().len() >> 2
-    }
-
-    fn vertex(&self, idx: usize) -> Vertex {
-        let i = idx << 2;
-        let bytes = self.map_data.vertexes();
-        Vertex {
-            x: buf_to_i16(&bytes[(i + 0)..(i + 2)]) as i32,
-            y: buf_to_i16(&bytes[(i + 2)..(i + 4)]) as i32,
-        }
-    }
-
-    #[inline]
     fn line_count(&self) -> usize {
         self.map_data.linedefs().len() / 14
     }
@@ -178,8 +163,8 @@ impl LevelMap {
         let vi1 = buf_to_u16(&bytes[(i + 0)..(i + 2)]);
         let vi2 = buf_to_u16(&bytes[(i + 2)..(i + 4)]);
         LineDef {
-            v1: self.vertex(vi1 as usize),
-            v2: self.vertex(vi2 as usize),
+            v1: self.map_data.vertex(vi1 as usize),
+            v2: self.map_data.vertex(vi2 as usize),
             flags: buf_to_u16(&bytes[(i + 4)..(i + 6)]),
             _line_type: buf_to_u16(&bytes[(i + 6)..(i + 8)]),
             _sector_tag: buf_to_u16(&bytes[(i + 8)..(i + 10)]),
@@ -199,10 +184,10 @@ impl LevelMap {
     }
 
     fn compute_automap_bounds(&mut self) {
-        self.amap_bl = self.vertex(0);
-        self.amap_tr = self.vertex(0);
-        for idx in 1..self.vertex_count() {
-            let v = self.vertex(idx);
+        self.amap_bl = self.map_data.vertex(0);
+        self.amap_tr = self.map_data.vertex(0);
+        for idx in 1..self.map_data.vertex_count() {
+            let v = self.map_data.vertex(idx);
             self.amap_bl.x = Ord::min(self.amap_bl.x, v.x);
             self.amap_bl.y = Ord::min(self.amap_bl.y, v.y);
             self.amap_tr.x = Ord::max(self.amap_tr.x, v.x);

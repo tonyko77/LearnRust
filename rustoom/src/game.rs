@@ -24,6 +24,7 @@ pub struct DoomGame {
     _tex_gfx: Texture,
     _pink_outline: bool,
     _bsp_node_idx: usize,
+    _ss_idx: usize,
 }
 
 impl DoomGame {
@@ -40,6 +41,7 @@ impl DoomGame {
             _tex_gfx: Texture::new(0, 0, 0),
             _pink_outline: false,
             _bsp_node_idx: 0,
+            _ss_idx: 0,
         };
         engine.load_map(0);
         engine.update_state(0.0);
@@ -112,20 +114,19 @@ impl DoomGame {
     fn paint_bsp(&self, painter: &mut dyn Painter) {
         self.map.paint_automap(painter, self.wad_data.font());
 
-        // paint the player's boxes
+        // paint the subsectors
         let plpos = self.map.get_player().pos();
-        let nodes = self.map.bsp().seek_player(&plpos);
-        let mut gray_lev = 255;
-        for n in nodes {
-            let col_left = RGB::from(gray_lev, 0, gray_lev);
-            let col_right = RGB::from(0, gray_lev, 0);
-            self.paint_rect(painter, &n.left_box_bl, &n.left_box_tr, col_left);
-            self.paint_rect(painter, &n.right_box_bl, &n.right_box_tr, col_right);
-            if gray_lev < 20 {
-                break;
-            }
-            gray_lev -= 20;
+        let ssects = self.map.bsp().locate_player(&plpos);
+        let idx = self._ss_idx % ssects.len();
+
+        let segs = &ssects[idx].0;
+        for seg in segs.iter() {
+            let v1 = self.map.translate_automap_vertex(seg.start, painter);
+            let v2 = self.map.translate_automap_vertex(seg.end, painter);
+            painter.draw_line(v1.x, v1.y, v2.x, v2.y, GREY);
         }
+        let text = format!("SSECT {idx} / {} -> {} segs", ssects.len(), segs.len());
+        self.wad_data.font().draw_text(3, 26, &text, GREY, painter);
 
         // get the bsp node
         let idx = self._bsp_node_idx;
@@ -206,6 +207,12 @@ impl DoomGame {
                 self._x_mode += 1;
             }
             Keycode::Insert => {
+                self._ss_idx = self._ss_idx.wrapping_sub(1);
+            }
+            Keycode::Delete => {
+                self._ss_idx = self._ss_idx.wrapping_add(1);
+            }
+            Keycode::Backspace => {
                 self._pink_outline = !self._pink_outline;
             }
             _ => {}
