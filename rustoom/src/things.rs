@@ -3,7 +3,7 @@
 //! See [things](https://doomwiki.org/wiki/Thing) and
 //! [thing types](https://doomwiki.org/wiki/Thing_types) at Doom Wiki.
 
-use crate::{utils::*, Vertex};
+use crate::{common::*, utils::*};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ThingType {
@@ -24,7 +24,7 @@ pub enum ThingType {
 #[derive(Clone, Default)]
 pub struct Thing {
     pos: Vertex,
-    angle: i16,
+    angle: Angle,
     type_code: u16,
     flags: u16,
     // TODO (later) fill in other values, based on type code
@@ -37,13 +37,16 @@ pub struct Thing {
 impl Thing {
     pub fn from(lump_data: &[u8]) -> Self {
         assert!(lump_data.len() >= 10);
+        let angle_deg = buf_to_i16(&lump_data[4..6]) as i32;
+        let angle = Angle::from_degrees(angle_deg);
         let type_code = buf_to_u16(&lump_data[6..8]);
+
         Self {
             pos: Vertex {
                 x: buf_to_i16(&lump_data[0..2]) as i32,
                 y: buf_to_i16(&lump_data[2..4]) as i32,
             },
-            angle: buf_to_i16(&lump_data[4..6]),
+            angle,
             type_code,
             flags: buf_to_u16(&lump_data[8..10]),
         }
@@ -55,7 +58,7 @@ impl Thing {
     }
 
     #[inline]
-    pub fn angle(&self) -> i16 {
+    pub fn angle(&self) -> Angle {
         self.angle
     }
 

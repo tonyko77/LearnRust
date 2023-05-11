@@ -3,8 +3,33 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 
+use std::f64::consts::PI;
 
+//----------------------------------------------------
+//  Deg to rad + clamp between 0 .. 2*pi
 
+fn main() {
+    deg_to_rad(0);
+    deg_to_rad(1);
+    deg_to_rad(90);
+    deg_to_rad(180);
+    deg_to_rad(359);
+    deg_to_rad(360);
+    deg_to_rad(362);
+    deg_to_rad(720);
+    deg_to_rad(-1);
+    deg_to_rad(-362);
+    deg_to_rad(-723);
+}
+
+fn deg_to_rad(deg: i32) -> f64 {
+    let xdeg = ((deg % 360) + if deg < 0 { 360 } else { 0 }) as f64;
+    // let xdeg = deg - (((deg / 360.0) as i32) * 360) as f64;
+    // let xdeg = if xdeg < 0.0 { xdeg + 360.0 } else { xdeg };
+    let rad = xdeg * PI / 180.0;
+    println!("Deg(in) = {deg} => Deg(out) = {xdeg} ; Rad = {rad}");
+    rad
+}
 
 //----------------------------------------------------
 // Test how to use a struct to borrow a variable
@@ -30,7 +55,7 @@ fn _borrow_main() {
 
 //----------------------------------------------------
 // Test how signed<-> unsigned casting works
-fn main() {
+fn _signed_unsigned_main() {
     // test casting signed <-> unsigned
     let sgn: i8 = -1;
     println!("i8={sgn} => i8->u8={} ,", sgn as u8);
@@ -45,5 +70,3 @@ fn main() {
         println!("ch={ch} => code={cod} , d={d}");
     }
 }
-
-

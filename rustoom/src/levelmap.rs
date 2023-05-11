@@ -20,7 +20,7 @@ const LINE_NEVER_ON_AMAP: u16 = 0x0080;
 const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
 // Automap zoom limits
-const DEFAULT_AUTOMAP_ZOOM: i32 = 7;
+const DEFAULT_AUTOMAP_ZOOM: i32 = 12;
 const AUTOMAP_ZOOM_MIN: i32 = 5;
 const AUTOMAP_ZOOM_MAX: i32 = 60;
 

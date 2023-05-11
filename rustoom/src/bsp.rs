@@ -175,7 +175,7 @@ impl BspNode {
 pub struct Seg {
     pub start: Vertex,
     pub end: Vertex,
-    angle: i16,
+    angle: Angle,
     linedef_idx: u16,
     direction_same: bool,
     offset: i16,
@@ -185,10 +185,12 @@ impl Seg {
     fn from(bytes: &[u8], map_data: &MapData) -> Self {
         let start = map_data.vertex(buf_to_u16(&bytes[0..2]) as usize);
         let end = map_data.vertex(buf_to_u16(&bytes[2..4]) as usize);
+        let seg_angle = buf_to_u16(&bytes[4..6]);
+        let angle = Angle::from_segment_angle(seg_angle);
         Self {
             start,
             end,
-            angle: buf_to_i16(&bytes[4..6]),
+            angle,
             linedef_idx: buf_to_u16(&bytes[6..8]),
             direction_same: 0 == buf_to_u16(&bytes[8..10]),
             offset: buf_to_i16(&bytes[10..12]),

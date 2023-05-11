@@ -1,6 +1,7 @@
 //! Main lib for the RustooM Doom-like engine/demo
 
 mod bsp;
+mod common;
 mod font;
 mod game;
 mod graphics;
@@ -9,13 +10,13 @@ mod map;
 mod painter;
 mod palette;
 mod pixmap;
-mod screen;
 mod sdl_wrapper;
 mod things;
 mod utils;
 mod wad;
 
 pub use bsp::*;
+pub use common::*;
 pub use font::*;
 pub use game::*;
 pub use graphics::*;
@@ -23,7 +24,6 @@ pub use levelmap::*;
 pub use painter::*;
 pub use palette::*;
 pub use pixmap::*;
-pub use screen::*;
 pub use sdl_wrapper::*;
 pub use things::*;
 pub use wad::*;
@@ -47,36 +47,3 @@ pub const BROWN: RGB = RGB { r: 160, g: 80, b: 0 };
 pub const CHOCO: RGB = RGB { r: 192, g: 128, b: 64 };
 pub const ORANGE: RGB = RGB { r: 255, g: 128, b: 0 };
 pub const PINK: RGB = RGB { r: 255, g: 0, b: 255 };
-
-/// Helpful structure, for vertexes.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct Vertex {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Vertex {
-    #[inline]
-    pub fn add(&self, other: &Vertex) -> Vertex {
-        Vertex {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        }
-    }
-
-    #[inline]
-    pub fn sub(&self, other: &Vertex) -> Vertex {
-        Vertex {
-            x: self.x - other.x,
-            y: self.y - other.y,
-        }
-    }
-
-    #[inline]
-    pub fn scale(&self, mul: i32, div: i32) -> Vertex {
-        Vertex {
-            x: self.x * mul / div,
-            y: self.y * mul / div,
-        }
-    }
-}
