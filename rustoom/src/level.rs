@@ -25,7 +25,7 @@ const AUTOMAP_ZOOM_MAX: i32 = 60;
 
 const SSECTOR_FLAG: u16 = 0x8000;
 
-pub struct LevelMap {
+pub struct ActiveLevel {
     map_data: MapData,
     player: Thing,
     amap_center: Vertex,
@@ -34,7 +34,7 @@ pub struct LevelMap {
     amap_zoom: i32,
 }
 
-impl LevelMap {
+impl ActiveLevel {
     pub fn new(map_data: &MapData) -> Self {
         let mut map = Self {
             map_data: map_data.clone(),

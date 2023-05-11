@@ -17,16 +17,6 @@ const IDX_REJECT: usize = 8;
 const IDX_BLOCKMAP: usize = 9;
 const LUMP_CNT: usize = 10;
 
-// Lump item sizes
-const THING_SIZE: usize = 10;
-const LINEDEF_SIZE: usize = 14;
-const SIDEDEF_SIZE: usize = 30;
-//TODO const VERTEX_SIZE: usize = 4;
-const SEG_SIZE: usize = 12;
-const SSECTOR_SIZE: usize = 4;
-const NODE_SIZE: usize = 28;
-const SECTOR_SIZE: usize = 26;
-
 pub struct MapData {
     name: String,
     lumps: Box<[Bytes; LUMP_CNT]>,
@@ -63,17 +53,12 @@ impl MapData {
 
     #[inline]
     pub fn vertex_count(&self) -> usize {
-        self.lumps[IDX_VERTEXES].len() >> 2
+        self.lumps[IDX_VERTEXES].len() / VERTEX_SIZE
     }
 
     #[inline]
     pub fn vertex(&self, idx: usize) -> Vertex {
-        let i = idx << 2;
-        let bytes = &self.lumps[IDX_VERTEXES];
-        Vertex {
-            x: buf_to_i16(&bytes[(i + 0)..(i + 2)]) as i32,
-            y: buf_to_i16(&bytes[(i + 2)..(i + 4)]) as i32,
-        }
+        Vertex::from_lump(&self.lumps[IDX_VERTEXES], idx)
     }
 
     #[inline(always)]
@@ -94,20 +79,17 @@ impl MapData {
 
     #[inline(always)]
     pub fn linedef(&self, idx: usize) -> LineDef {
-        let bytes = checked_slice(&self.lumps[IDX_LINEDEFS], idx, LINEDEF_SIZE);
-        LineDef::from_lump(bytes, self)
+        LineDef::from_lump(&self.lumps[IDX_LINEDEFS], idx, &self.lumps[IDX_VERTEXES])
     }
 
     #[inline(always)]
     pub fn sidedef(&self, idx: usize) -> SideDef {
-        let bytes = checked_slice(&self.lumps[IDX_SIDEDEFS], idx, SIDEDEF_SIZE);
-        SideDef::from_lump(bytes)
+        SideDef::from_lump(&self.lumps[IDX_SIDEDEFS], idx)
     }
 
     #[inline(always)]
     pub fn sector(&self, idx: usize) -> Sector {
-        let bytes = checked_slice(&self.lumps[IDX_SECTORS], idx, SECTOR_SIZE);
-        Sector::from_lump(bytes)
+        Sector::from_lump(&self.lumps[IDX_SECTORS], idx)
     }
 
     #[inline(always)]
@@ -117,8 +99,7 @@ impl MapData {
 
     #[inline(always)]
     pub fn bsp_node(&self, idx: usize) -> BspNode {
-        let bytes = checked_slice(&self.lumps[IDX_NODES], idx, NODE_SIZE);
-        BspNode::from_lump(bytes)
+        BspNode::from_lump(&self.lumps[IDX_NODES], idx)
     }
 
     pub fn sub_sector(&self, idx: usize) -> Vec<Seg> {
@@ -127,14 +108,10 @@ impl MapData {
         let seg_count = buf_to_u16(&bytes[0..2]) as usize;
         let first_seg_idx = buf_to_u16(&bytes[2..4]) as usize;
         // from SEGS, extract each segment
-        let start = first_seg_idx * SEG_SIZE;
-        let end = start + seg_count * SEG_SIZE;
-        assert!(end <= self.lumps[IDX_SEGS].len());
-
-        let buf = &(self.lumps[IDX_SEGS])[start..end];
         let mut seg_collector = Vec::with_capacity(seg_count);
         for i in 0..seg_count {
-            let seg = Seg::from_lump(&buf[i * SEG_SIZE..(i + 1) * SEG_SIZE], self);
+            let idx = first_seg_idx + i;
+            let seg = Seg::from_lump(&self.lumps[IDX_SEGS], idx, &self.lumps[IDX_VERTEXES]);
             seg_collector.push(seg);
         }
         seg_collector

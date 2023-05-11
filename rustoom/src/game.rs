@@ -2,16 +2,16 @@
 
 /*
 TODO:
-    - add Angle class - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes010/notes
-    - add Screen class - to keep resolution + FOV/aspect ratio calculations
-    - refactor: move all rendering code into LevelMap !!
-    - continuous keys (movement, rotation)
+    - refactor: in ActiveLevel, I need to reference stuff from Wad + Screen
+        => find a nice way to keep all constant game data (Wad, Screen, list of MapData) in a CENTRAL location
+    - refactor: move all rendering code into ActiveLevel !!
+    - continuous keys (movement, rotation, strife etc)
     - automap: draw arrow for player + use yellow/choco colors correctly.
     - add Player/Actor class - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes005/notes
     - doc comments !!
  */
 
-use crate::levelmap::LevelMap;
+use crate::level::ActiveLevel;
 use crate::*;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -22,7 +22,7 @@ pub struct DoomGame {
     wad_data: WadData,
     _screen: Screen, // TODO use this
     map_idx: usize,
-    map: LevelMap,
+    map: ActiveLevel,
     gameplay_flags: u32,
 }
 

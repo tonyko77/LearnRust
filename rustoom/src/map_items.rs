@@ -1,13 +1,17 @@
 //! Structs for the various items found in a map.
 
+use crate::{utils::*, Angle};
 use std::ops::{Add, Sub};
 
-use crate::{map::MapData, utils::*, Angle};
-
-// const IDX_SEGS: usize = 4;
-// const IDX_SSECTORS: usize = 5;
-// const IDX_REJECT: usize = 8;
-// const IDX_BLOCKMAP: usize = 9;
+// Lump item sizes
+pub const THING_SIZE: usize = 10;
+pub const LINEDEF_SIZE: usize = 14;
+pub const SIDEDEF_SIZE: usize = 30;
+pub const VERTEX_SIZE: usize = 4;
+pub const SEG_SIZE: usize = 12;
+pub const SSECTOR_SIZE: usize = 4;
+pub const NODE_SIZE: usize = 28;
+pub const SECTOR_SIZE: usize = 26;
 
 /// A Vertex is a point in the 2D top-view space of a level map.<br/>
 /// **Note:** the Y axis goes *upwards* (towards North), like in a normal xOy system,
@@ -19,6 +23,15 @@ pub struct Vertex {
 }
 
 impl Vertex {
+    #[inline]
+    pub fn from_lump(lump: &[u8], idx: usize) -> Self {
+        let bytes = checked_slice(lump, idx, VERTEX_SIZE);
+        Vertex {
+            x: buf_to_i16(&bytes[0..2]) as i32,
+            y: buf_to_i16(&bytes[2..4]) as i32,
+        }
+    }
+
     #[inline]
     pub fn scale(&self, mul: i32, div: i32) -> Self {
         Self {
@@ -63,13 +76,13 @@ pub struct LineDef {
 }
 
 impl LineDef {
-    // TODO get rid of circular dependency to/from MapData !!
-    pub fn from_lump(bytes: &[u8], map_data: &MapData) -> Self {
-        let vi1 = buf_to_u16(&bytes[0..2]) as usize;
-        let vi2 = buf_to_u16(&bytes[2..4]) as usize;
+    pub fn from_lump(lump: &[u8], idx: usize, vertex_lump: &[u8]) -> Self {
+        let bytes = checked_slice(lump, idx, LINEDEF_SIZE);
+        let v1_idx = buf_to_u16(&bytes[0..2]) as usize;
+        let v2_idx = buf_to_u16(&bytes[2..4]) as usize;
         Self {
-            v1: map_data.vertex(vi1),
-            v2: map_data.vertex(vi2),
+            v1: Vertex::from_lump(vertex_lump, v1_idx),
+            v2: Vertex::from_lump(vertex_lump, v2_idx),
             flags: buf_to_u16(&bytes[4..6]),
             line_type: buf_to_u16(&bytes[6..8]),
             sector_tag: buf_to_u16(&bytes[8..10]),
@@ -91,7 +104,8 @@ pub struct SideDef {
 }
 
 impl SideDef {
-    pub fn from_lump(bytes: &[u8]) -> Self {
+    pub fn from_lump(lump: &[u8], idx: usize) -> Self {
+        let bytes = checked_slice(lump, idx, SIDEDEF_SIZE);
         Self {
             x_offset: buf_to_i16(&bytes[0..2]),
             y_offset: buf_to_i16(&bytes[2..4]),
@@ -116,7 +130,8 @@ pub struct Sector {
 }
 
 impl Sector {
-    pub fn from_lump(bytes: &[u8]) -> Self {
+    pub fn from_lump(lump: &[u8], idx: usize) -> Self {
+        let bytes = checked_slice(lump, idx, SECTOR_SIZE);
         Self {
             floor_height: buf_to_i16(&bytes[0..2]),
             ceiling_height: buf_to_i16(&bytes[2..4]),
@@ -134,19 +149,19 @@ impl Sector {
 pub struct BspNode {
     vect_orig: Vertex,
     vect_dir: Vertex,
-    // TODO use bounding boxes to optimize drawing (not relly needed, but niiice)
-    _right_box_tr: Vertex,
-    _right_box_bl: Vertex,
-    _left_box_tr: Vertex,
-    _left_box_bl: Vertex,
     pub right_child: u16,
     pub left_child: u16,
+    // TODO use bounding boxes to optimize drawing
+    // not really needed, but it would be nice to have :)
+    // _right_box_tr: Vertex,
+    // _right_box_bl: Vertex,
+    // _left_box_tr: Vertex,
+    // _left_box_bl: Vertex,
 }
 
-// TODO if most data is not needed => just remove this struct,
-// put the code in a function and directly access the data from the lump
 impl BspNode {
-    pub fn from_lump(bytes: &[u8]) -> Self {
+    pub fn from_lump(lump: &[u8], idx: usize) -> Self {
+        let bytes = checked_slice(lump, idx, NODE_SIZE);
         let vect = buf_to_i16_vect(&bytes[0..24]);
         Self {
             vect_orig: Vertex {
@@ -157,26 +172,26 @@ impl BspNode {
                 x: vect[2] as i32,
                 y: vect[3] as i32,
             },
-            _right_box_bl: Vertex {
-                // TODO figure out the order of the vertices
-                x: Ord::min(vect[6], vect[7]) as i32,
-                y: Ord::min(vect[4], vect[5]) as i32,
-            },
-            _right_box_tr: Vertex {
-                // TODO figure out the order of the vertices
-                x: Ord::max(vect[6], vect[7]) as i32,
-                y: Ord::max(vect[4], vect[5]) as i32,
-            },
-            _left_box_bl: Vertex {
-                // TODO figure out the order of the vertices
-                x: Ord::min(vect[10], vect[11]) as i32,
-                y: Ord::min(vect[8], vect[9]) as i32,
-            },
-            _left_box_tr: Vertex {
-                // TODO figure out the order of the vertices
-                x: Ord::max(vect[10], vect[11]) as i32,
-                y: Ord::max(vect[8], vect[9]) as i32,
-            },
+            // _right_box_bl: Vertex {
+            //     // TODO figure out the order of the vertices
+            //     x: Ord::min(vect[6], vect[7]) as i32,
+            //     y: Ord::min(vect[4], vect[5]) as i32,
+            // },
+            // _right_box_tr: Vertex {
+            //     // TODO figure out the order of the vertices
+            //     x: Ord::max(vect[6], vect[7]) as i32,
+            //     y: Ord::max(vect[4], vect[5]) as i32,
+            // },
+            // _left_box_bl: Vertex {
+            //     // TODO figure out the order of the vertices
+            //     x: Ord::min(vect[10], vect[11]) as i32,
+            //     y: Ord::min(vect[8], vect[9]) as i32,
+            // },
+            // _left_box_tr: Vertex {
+            //     // TODO figure out the order of the vertices
+            //     x: Ord::max(vect[10], vect[11]) as i32,
+            //     y: Ord::max(vect[8], vect[9]) as i32,
+            // },
             right_child: buf_to_u16(&bytes[24..26]),
             left_child: buf_to_u16(&bytes[26..28]),
         }
@@ -203,15 +218,15 @@ pub struct Seg {
 }
 
 impl Seg {
-    // TODO get rid of circular dependency to/from MapData !!
-    pub fn from_lump(bytes: &[u8], map_data: &MapData) -> Self {
-        let start = map_data.vertex(buf_to_u16(&bytes[0..2]) as usize);
-        let end = map_data.vertex(buf_to_u16(&bytes[2..4]) as usize);
+    pub fn from_lump(lump: &[u8], idx: usize, vertex_lump: &[u8]) -> Self {
+        let bytes = checked_slice(lump, idx, SEG_SIZE);
+        let start_idx = buf_to_u16(&bytes[0..2]) as usize;
+        let end_idx = buf_to_u16(&bytes[2..4]) as usize;
         let seg_angle = buf_to_u16(&bytes[4..6]);
         let angle = Angle::from_segment_angle(seg_angle);
         Self {
-            start,
-            end,
+            start: Vertex::from_lump(vertex_lump, start_idx),
+            end: Vertex::from_lump(vertex_lump, end_idx),
             angle,
             linedef_idx: buf_to_u16(&bytes[6..8]),
             direction_same: 0 == buf_to_u16(&bytes[8..10]),

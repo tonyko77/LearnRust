@@ -4,7 +4,7 @@ mod common;
 mod font;
 mod game;
 mod graphics;
-mod levelmap;
+mod level;
 mod map;
 mod map_items;
 mod painter;

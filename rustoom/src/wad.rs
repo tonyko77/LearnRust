@@ -3,7 +3,7 @@
 
 use crate::font::Font;
 use crate::graphics::Graphics;
-use crate::levelmap::LevelMap;
+use crate::level::ActiveLevel;
 use crate::map::*;
 use crate::palette::Palette;
 use crate::*;
@@ -72,10 +72,10 @@ impl WadData {
     }
 
     #[inline]
-    pub fn load_map(&self, idx: usize) -> LevelMap {
+    pub fn load_map(&self, idx: usize) -> ActiveLevel {
         // TODO panic-safe error handling ?!?
         assert!(idx < self.maps.len());
-        LevelMap::new(&self.maps[idx])
+        ActiveLevel::new(&self.maps[idx])
     }
 
     #[inline]
