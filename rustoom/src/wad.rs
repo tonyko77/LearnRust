@@ -22,7 +22,6 @@ impl WadData {
         {
             let mut file = File::open(wad_path).map_err(|e| e.to_string())?;
             let len = file.metadata().map_err(|e| e.to_string())?.len() as usize;
-            println!("[DBG] WAD size: {}", len);
             wad_bytes = BytesMut::zeroed(len);
             file.read_exact(&mut wad_bytes).map_err(|e| e.to_string())?;
         }

@@ -52,7 +52,7 @@ impl DoomGame {
         if self.map_idx != idx && idx < self.wad_data.map_count() {
             self.map_idx = idx;
             self.map = self.wad_data.load_map(idx);
-            self._bsp_node_idx = self.map.bsp().get_node_count() - 1;
+            self._bsp_node_idx = self.map.bsp().node_count() - 1;
         }
     }
 
@@ -130,7 +130,7 @@ impl DoomGame {
 
         // get the bsp node
         let idx = self._bsp_node_idx;
-        let node = self.map.bsp().get_node(idx);
+        let node = self.map.bsp().node(idx);
         // paint left rect
         self.paint_rect(painter, &node.left_box_bl, &node.left_box_tr, PINK);
         // paint right rect
@@ -143,7 +143,7 @@ impl DoomGame {
         painter.draw_line(ov.x, ov.y, dv.x, dv.y, WHITE);
         painter.fill_circle(dv.x, dv.y, 1, WHITE);
 
-        let text = format!("BSP node {idx} / {}", self.map.bsp().get_node_count());
+        let text = format!("BSP node {idx} / {}", self.map.bsp().node_count());
         self.wad_data.font().draw_text(3, 15, &text, WHITE, painter);
     }
 
@@ -159,12 +159,12 @@ impl DoomGame {
 
     fn bsp_move(&mut self, go_right: bool) {
         let idx = self._bsp_node_idx;
-        let node = self.map.bsp().get_node(idx);
+        let node = self.map.bsp().node(idx);
         let next = if go_right { node.right_child } else { node.left_child };
         self._bsp_node_idx = if (next & 0x8000) == 0 {
             next as usize
         } else {
-            self.map.bsp().get_node_count() - 1
+            self.map.bsp().node_count() - 1
         };
     }
 

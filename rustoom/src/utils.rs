@@ -29,6 +29,14 @@ pub fn buf_to_i16_vect(buf: &[u8]) -> Vec<i16> {
     vct
 }
 
+#[inline(always)]
+pub fn checked_slice(buf: &[u8], idx: usize, item_size: usize) -> &[u8] {
+    let start = idx * item_size;
+    let end = start + item_size;
+    assert!(end <= buf.len());
+    &buf[start..end]
+}
+
 /// Convert a lump name into a 64 bit integer, for easier use as key in a hashmap.
 /// Since lumps should only use digits, upper case letters and a few simbols
 /// => they fall into the range 32-95 (0x20-0x5F)

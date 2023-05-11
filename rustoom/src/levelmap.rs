@@ -1,6 +1,9 @@
 //! An "active" level map, where all the map data is expanded and "mutable".
 //! Built from an existing MapData.
 
+// TODO temporary !!!
+#![allow(dead_code)]
+
 use crate::map::*;
 use crate::utils::*;
 use crate::*;
@@ -20,6 +23,12 @@ const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 const DEFAULT_AUTOMAP_ZOOM: i32 = 7;
 const AUTOMAP_ZOOM_MIN: i32 = 5;
 const AUTOMAP_ZOOM_MAX: i32 = 60;
+
+// Lump item sizes
+const LINEDEF_SIZE: usize = 14;
+const SIDEDEF_SIZE: usize = 30;
+const SECTOR_SIZE: usize = 26;
+const THING_SIZE: usize = 10;
 
 pub struct LevelMap {
     map_data: MapData,
@@ -83,7 +92,7 @@ impl LevelMap {
     }
 
     pub fn paint_automap(&self, painter: &mut dyn Painter, font: &Font) {
-        for idx in 0..self.line_count() {
+        for idx in 0..self.linedef_count() {
             let line = self.linedef(idx);
             let v1 = self.translate_automap_vertex(line.v1, painter);
             let v2 = self.translate_automap_vertex(line.v2, painter);
@@ -136,6 +145,7 @@ impl LevelMap {
     // private methods
     //---------------
 
+    // TODO temp pub !!
     pub fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> Vertex {
         // scale the original coordinates
         let sv = orig_vertex.sub(&self.amap_center).scale(self.amap_zoom, 100);
@@ -150,37 +160,6 @@ impl LevelMap {
         let v = self.translate_automap_vertex(v, painter);
         painter.draw_line(v.x - 1, v.y, v.x + 1, v.y, color);
         painter.draw_line(v.x, v.y - 1, v.x, v.y + 1, color);
-    }
-
-    #[inline]
-    fn line_count(&self) -> usize {
-        self.map_data.linedefs().len() / 14
-    }
-
-    fn linedef(&self, idx: usize) -> LineDef {
-        let i = idx * 14;
-        let bytes = self.map_data.linedefs();
-        let vi1 = buf_to_u16(&bytes[(i + 0)..(i + 2)]);
-        let vi2 = buf_to_u16(&bytes[(i + 2)..(i + 4)]);
-        LineDef {
-            v1: self.map_data.vertex(vi1 as usize),
-            v2: self.map_data.vertex(vi2 as usize),
-            flags: buf_to_u16(&bytes[(i + 4)..(i + 6)]),
-            _line_type: buf_to_u16(&bytes[(i + 6)..(i + 8)]),
-            _sector_tag: buf_to_u16(&bytes[(i + 8)..(i + 10)]),
-            _right_side_def: buf_to_u16(&bytes[(i + 10)..(i + 12)]),
-            _left_side_def: buf_to_u16(&bytes[(i + 12)..(i + 14)]),
-        }
-    }
-
-    #[inline]
-    fn thing_count(&self) -> usize {
-        self.map_data.things().len() / 10
-    }
-
-    fn thing(&self, idx: usize) -> Thing {
-        let bytes = self.map_data.things();
-        Thing::new(&bytes[(idx * 10)..(idx * 10 + 10)])
     }
 
     fn compute_automap_bounds(&mut self) {
@@ -204,18 +183,115 @@ impl LevelMap {
         }
         None
     }
+
+    // TODO is this needed? or only temporary?
+    #[inline(always)]
+    fn thing_count(&self) -> usize {
+        self.map_data.things().len() / THING_SIZE
+    }
+
+    #[inline(always)]
+    fn thing(&self, idx: usize) -> Thing {
+        let bytes = checked_slice(&&&self.map_data.things(), idx, THING_SIZE);
+        Thing::from(bytes)
+    }
+
+    // TODO is this needed? or only temporary?
+    #[inline(always)]
+    fn linedef_count(&self) -> usize {
+        self.map_data.linedefs().len() / LINEDEF_SIZE
+    }
+
+    #[inline(always)]
+    fn linedef(&self, idx: usize) -> LineDef {
+        let bytes = checked_slice(&self.map_data.linedefs(), idx, LINEDEF_SIZE);
+        LineDef::from(bytes, &self.map_data)
+    }
+
+    #[inline(always)]
+    fn sidedef(&self, idx: usize) -> SideDef {
+        let bytes = checked_slice(&self.map_data.sidedefs(), idx, SIDEDEF_SIZE);
+        SideDef::from(bytes)
+    }
+
+    #[inline(always)]
+    fn sector(&self, idx: usize) -> Sector {
+        let bytes = checked_slice(&self.map_data.sectors(), idx, SECTOR_SIZE);
+        Sector::from(bytes)
+    }
 }
 
 //--------------------
 //  Internal stuff
 
-#[derive(Debug)]
 struct LineDef {
-    pub v1: Vertex,
-    pub v2: Vertex,
-    pub flags: u16,
-    pub _line_type: u16,
-    pub _sector_tag: u16,
-    pub _right_side_def: u16,
-    pub _left_side_def: u16,
+    v1: Vertex,
+    v2: Vertex,
+    flags: u16,
+    line_type: u16,
+    sector_tag: u16,
+    right_sidedef_idx: u16,
+    left_sidedef_idx: u16,
+}
+
+impl LineDef {
+    fn from(bytes: &[u8], map_data: &MapData) -> Self {
+        let vi1 = buf_to_u16(&bytes[0..2]) as usize;
+        let vi2 = buf_to_u16(&bytes[2..4]) as usize;
+        Self {
+            v1: map_data.vertex(vi1),
+            v2: map_data.vertex(vi2),
+            flags: buf_to_u16(&bytes[4..6]),
+            line_type: buf_to_u16(&bytes[6..8]),
+            sector_tag: buf_to_u16(&bytes[8..10]),
+            right_sidedef_idx: buf_to_u16(&bytes[10..12]),
+            left_sidedef_idx: buf_to_u16(&bytes[12..14]),
+        }
+    }
+}
+
+struct SideDef {
+    x_offset: i16,
+    y_offset: i16,
+    upper_texture_key: u64,
+    lower_texture_key: u64,
+    middle_texture_key: u64,
+    sector_idx: u16,
+}
+
+impl SideDef {
+    fn from(bytes: &[u8]) -> Self {
+        Self {
+            x_offset: buf_to_i16(&bytes[0..2]),
+            y_offset: buf_to_i16(&bytes[2..4]),
+            upper_texture_key: hash_lump_name(&bytes[4..12]),
+            lower_texture_key: hash_lump_name(&bytes[12..20]),
+            middle_texture_key: hash_lump_name(&bytes[20..28]),
+            sector_idx: buf_to_u16(&bytes[28..30]),
+        }
+    }
+}
+
+struct Sector {
+    floor_height: i16,
+    ceiling_height: i16,
+    floor_flat_key: u64,
+    ceiling_flat_key: u64,
+    light_level: u16,
+    special_type: u16,
+    tag_nr: u16,
+}
+
+impl Sector {
+    fn from(bytes: &[u8]) -> Self {
+        Self {
+            floor_height: buf_to_i16(&bytes[0..2]),
+            ceiling_height: buf_to_i16(&bytes[2..4]),
+            floor_flat_key: hash_lump_name(&bytes[4..12]),
+            ceiling_flat_key: hash_lump_name(&bytes[12..20]),
+            light_level: buf_to_u16(&bytes[20..22]),
+            special_type: buf_to_u16(&bytes[22..24]),
+            tag_nr: buf_to_u16(&bytes[24..26]),
+        }
+    }
 }

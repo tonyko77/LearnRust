@@ -35,7 +35,7 @@ pub struct Thing {
 }
 
 impl Thing {
-    pub fn new(lump_data: &[u8]) -> Self {
+    pub fn from(lump_data: &[u8]) -> Self {
         assert!(lump_data.len() >= 10);
         let type_code = buf_to_u16(&lump_data[6..8]);
         Self {
