@@ -115,8 +115,8 @@ impl DoomGame {
         self.map.paint_automap(painter, self.wad_data.font());
 
         // paint the subsectors
-        let plpos = self.map.get_player().pos();
-        let ssects = self.map.bsp().locate_player(&plpos);
+        let player = &self.map.get_player();
+        let ssects = self.map.bsp().locate_player(player);
         let idx = self._ss_idx % ssects.len();
 
         let segs = &ssects[idx];

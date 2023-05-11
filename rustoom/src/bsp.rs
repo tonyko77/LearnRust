@@ -33,7 +33,7 @@ impl BspTree {
     }
 
     // TODO (later) replace Vec<Vec<Seg>> with Vec<Seg> - no reason to have a vector of vectors
-    pub fn locate_player(&self, player: &Vertex) -> Vec<Vec<Seg>> {
+    pub fn locate_player(&self, player: &Thing) -> Vec<Vec<Seg>> {
         let mut sect_collector = vec![];
         let start_idx = (self.node_count() - 1) as u16;
         self.render_node(player, start_idx, &mut sect_collector);
@@ -52,19 +52,23 @@ impl BspTree {
 
     //----------------------------
 
-    fn render_node(&self, player: &Vertex, node_idx: u16, sect_collector: &mut Vec<Vec<Seg>>) {
+    fn render_node(&self, player: &Thing, node_idx: u16, sect_collector: &mut Vec<Vec<Seg>>) {
         if (node_idx & SSECTOR_FLAG) == 0 {
             // NOT a leaf
             let node = self.node(node_idx as usize);
-            let is_on_left = node.is_point_on_left(player);
+            let is_on_left = node.is_point_on_left(&player.pos());
             if is_on_left {
                 // traverse LEFT first
                 self.render_node(player, node.left_child, sect_collector);
-                self.render_node(player, node.right_child, sect_collector);
+                if self.check_bounding_box(player, &node.right_box_bl, &node.right_box_tr) {
+                    self.render_node(player, node.right_child, sect_collector);
+                }
             } else {
                 // traverse RIGHT first
                 self.render_node(player, node.right_child, sect_collector);
-                self.render_node(player, node.left_child, sect_collector);
+                if self.check_bounding_box(player, &node.left_box_bl, &node.left_box_tr) {
+                    self.render_node(player, node.left_child, sect_collector);
+                }
             }
         } else {
             // it's a LEAF => render sector
@@ -82,6 +86,14 @@ impl BspTree {
         // from SEGS, extract each segment
         let segs = (0..seg_count).map(|idx| self.seg(first_seg_idx + idx)).collect();
         segs
+    }
+
+    /// Check if some of the bounding box might be visible to the player
+    /// (to optimize drawing if it is not).
+    fn check_bounding_box(&self, _player: &Thing, _bl_bbox: &Vertex, _tr_bbox: &Vertex) -> bool {
+        // TODO (later) implement this
+        // see https://github.com/chocolate-doom/chocolate-doom/blob/master/src/doom/r_bsp.c#L380
+        true
     }
 
     // TODO temp pub !!
