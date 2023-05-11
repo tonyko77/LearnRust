@@ -1,7 +1,11 @@
 //! WAD loader and parser.
 //! See [DIYDoom, Notes001](https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes001/notes).
 
+use crate::font::Font;
+use crate::graphics::Graphics;
+use crate::levelmap::LevelMap;
 use crate::map::*;
+use crate::palette::Palette;
 use crate::*;
 use bytes::{Bytes, BytesMut};
 use std::fs::*;

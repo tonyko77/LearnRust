@@ -3,7 +3,10 @@
 //! See [things](https://doomwiki.org/wiki/Thing) and
 //! [thing types](https://doomwiki.org/wiki/Thing_types) at Doom Wiki.
 
-use crate::{common::*, utils::*};
+// TODO temporary !!!
+#![allow(dead_code)]
+
+use crate::{common::*, map_items::Vertex, utils::*};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ThingType {

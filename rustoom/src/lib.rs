@@ -1,12 +1,12 @@
 //! Main lib for the RustooM Doom-like engine/demo
 
-mod bsp;
 mod common;
 mod font;
 mod game;
 mod graphics;
 mod levelmap;
 mod map;
+mod map_items;
 mod painter;
 mod palette;
 mod pixmap;
@@ -15,17 +15,10 @@ mod things;
 mod utils;
 mod wad;
 
-pub use bsp::*;
 pub use common::*;
-pub use font::*;
 pub use game::*;
-pub use graphics::*;
-pub use levelmap::*;
 pub use painter::*;
-pub use palette::*;
-pub use pixmap::*;
 pub use sdl_wrapper::*;
-pub use things::*;
 pub use wad::*;
 
 // TODO clean up unused colors (+ move them in another mod ?)

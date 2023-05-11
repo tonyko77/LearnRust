@@ -11,8 +11,8 @@ TODO:
     - doc comments !!
  */
 
+use crate::levelmap::LevelMap;
 use crate::*;
-use crate::{GraphicsLoop, Painter};
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
@@ -55,7 +55,7 @@ impl DoomGame {
 
         // TODO TEMPORARY: paint the subsectors
         let player = &self.map.get_player();
-        let segs = self.map.bsp().locate_player(player);
+        let segs = self.map.locate_player(player);
         for seg in segs.iter() {
             let v1 = self.map.translate_automap_vertex(seg.start, painter);
             let v2 = self.map.translate_automap_vertex(seg.end, painter);

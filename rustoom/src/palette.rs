@@ -1,7 +1,6 @@
 //! Palette and color handling/mapping
 
-use crate::ColorMapper;
-use crate::RGB;
+use crate::{pixmap::ColorMapper, RGB};
 use bytes::Bytes;
 
 pub struct Palette {

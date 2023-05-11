@@ -1,44 +1,10 @@
 //! Common structures, used in many places.
 
+use crate::map_items::Vertex;
 use std::{
     f64::consts::PI,
     ops::{Add, Sub},
 };
-
-/// A Vertex is a point in the 2D top-view space of a level map.<br/>
-/// **Note:** the Y axis goes *upwards* (towards North), like in a normal xOy system,
-/// and not like on screen, where the Y axis goes downwards.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
-pub struct Vertex {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Vertex {
-    #[inline]
-    pub fn add(&self, other: &Vertex) -> Vertex {
-        Vertex {
-            x: self.x + other.x,
-            y: self.y + other.y,
-        }
-    }
-
-    #[inline]
-    pub fn sub(&self, other: &Vertex) -> Vertex {
-        Vertex {
-            x: self.x - other.x,
-            y: self.y - other.y,
-        }
-    }
-
-    #[inline]
-    pub fn scale(&self, mul: i32, div: i32) -> Vertex {
-        Vertex {
-            x: self.x * mul / div,
-            y: self.y * mul / div,
-        }
-    }
-}
 
 /// Screen class - keeps resolution info and computes based on that the FOV/aspect ratio data.
 #[derive(Debug, Clone)]
@@ -96,7 +62,7 @@ impl Screen {
 
 /// Angle representation - kept as radians, for easier trigonometry.
 /// Also implements useful operations for angles.
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Angle(f64);
 
 impl Angle {
@@ -150,12 +116,6 @@ impl Angle {
         let deg = (self.0 * 180.0 / PI) as i32;
         // restrict degrees to [0 .. 360)
         (deg % 360) + if deg < 0 { 360 } else { 0 }
-    }
-}
-
-impl Default for Angle {
-    fn default() -> Self {
-        Self(0.0)
     }
 }
 

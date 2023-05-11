@@ -1,11 +1,10 @@
 //! An "active" level map, where all the map data is expanded and "mutable".
 //! Built from an existing MapData.
 
-// TODO temporary !!!
-#![allow(dead_code)]
-
+use crate::font::Font;
 use crate::map::*;
-use crate::utils::*;
+use crate::map_items::{Seg, Vertex};
+use crate::things::Thing;
 use crate::*;
 
 // LineDef flags
@@ -24,15 +23,10 @@ const DEFAULT_AUTOMAP_ZOOM: i32 = 12;
 const AUTOMAP_ZOOM_MIN: i32 = 5;
 const AUTOMAP_ZOOM_MAX: i32 = 60;
 
-// Lump item sizes
-const LINEDEF_SIZE: usize = 14;
-const SIDEDEF_SIZE: usize = 30;
-const SECTOR_SIZE: usize = 26;
-const THING_SIZE: usize = 10;
+const SSECTOR_FLAG: u16 = 0x8000;
 
 pub struct LevelMap {
     map_data: MapData,
-    bsp: BspTree,
     player: Thing,
     amap_center: Vertex,
     amap_bl: Vertex,
@@ -44,7 +38,6 @@ impl LevelMap {
     pub fn new(map_data: &MapData) -> Self {
         let mut map = Self {
             map_data: map_data.clone(),
-            bsp: BspTree::new(map_data),
             player: Default::default(),
             amap_center: Vertex { x: 0, y: 0 },
             amap_bl: Vertex { x: 0, y: 0 },
@@ -65,35 +58,29 @@ impl LevelMap {
         map
     }
 
-    // TODO TEMP method !!!
-    pub fn bsp(&self) -> &BspTree {
-        &self.bsp
-    }
-
     #[inline]
     pub fn name(&self) -> &str {
         &self.map_data.name()
     }
 
     pub fn get_things(&self, level_filter: u8) -> Vec<Thing> {
-        let cnt = self.thing_count();
-        (0..cnt)
-            .map(|idx| self.thing(idx))
+        (0..self.map_data.thing_count())
+            .map(|idx| self.map_data.thing(idx))
             .filter(|th| th.is_on_skill_level(level_filter))
             .collect()
     }
 
     pub fn get_player(&self) -> Thing {
-        let cnt = self.thing_count();
+        let cnt = self.map_data.thing_count();
         (0..cnt)
-            .map(|idx| self.thing(idx))
+            .map(|idx| self.map_data.thing(idx))
             .find(|th| th.type_code() == 1)
             .expect("Player not found in map's THINGS")
     }
 
     pub fn paint_automap(&self, painter: &mut dyn Painter, font: &Font) {
-        for idx in 0..self.linedef_count() {
-            let line = self.linedef(idx);
+        for idx in 0..self.map_data.linedef_count() {
+            let line = self.map_data.linedef(idx);
             let v1 = self.translate_automap_vertex(line.v1, painter);
             let v2 = self.translate_automap_vertex(line.v2, painter);
 
@@ -141,6 +128,46 @@ impl LevelMap {
         self.amap_zoom = Ord::clamp(self.amap_zoom + dzoom, AUTOMAP_ZOOM_MIN, AUTOMAP_ZOOM_MAX);
     }
 
+    pub fn locate_player(&self, player: &Thing) -> Vec<Seg> {
+        let mut sect_collector = vec![];
+        let start_idx = self.map_data.root_bsp_node_idx();
+        self.render_node(player, start_idx, &mut sect_collector);
+        sect_collector
+    }
+
+    //----------------------------
+
+    fn render_node(&self, player: &Thing, node_idx: u16, seg_collector: &mut Vec<Seg>) {
+        if (node_idx & SSECTOR_FLAG) == 0 {
+            // NOT a leaf
+            let node = self.map_data.bsp_node(node_idx as usize);
+            let is_on_left = node.is_point_on_left(player.pos());
+            if is_on_left {
+                // traverse LEFT first
+                self.render_node(player, node.left_child, seg_collector);
+                // TODO? if self.check_bounding_box(player, &node.right_box_bl, &node.right_box_tr) {
+                self.render_node(player, node.right_child, seg_collector);
+            } else {
+                // traverse RIGHT first
+                self.render_node(player, node.right_child, seg_collector);
+                // TODO? if self.check_bounding_box(player, &node.left_box_bl, &node.left_box_tr) {
+                self.render_node(player, node.left_child, seg_collector);
+            }
+        } else {
+            // it's a LEAF => render sector
+            self.render_sub_sector(node_idx, seg_collector);
+        }
+    }
+
+    fn render_sub_sector(&self, sect_idx: u16, seg_collector: &mut Vec<Seg>) {
+        let idx = (sect_idx & !SSECTOR_FLAG) as usize;
+        let segs = self.map_data.sub_sector(idx);
+        for s in segs {
+            // TODO render each segment
+            seg_collector.push(s);
+        }
+    }
+
     //---------------
     // private methods
     //---------------
@@ -148,7 +175,7 @@ impl LevelMap {
     // TODO temp pub !!
     pub fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> Vertex {
         // scale the original coordinates
-        let sv = orig_vertex.sub(&self.amap_center).scale(self.amap_zoom, 100);
+        let sv = (orig_vertex - self.amap_center).scale(self.amap_zoom, 100);
         // translate the scaled coordinates + mirror y
         Vertex {
             x: sv.x + (painter.get_screen_width() / 2),
@@ -175,123 +202,15 @@ impl LevelMap {
     }
 
     fn find_thing_by_type(&self, thing_type: u16) -> Option<Thing> {
-        for idx in 0..self.thing_count() {
-            let th = self.thing(idx);
+        for idx in 0..self.map_data.thing_count() {
+            let th = self.map_data.thing(idx);
             if th.type_code() == thing_type {
                 return Some(th);
             }
         }
         None
     }
-
-    // TODO is this needed? or only temporary?
-    #[inline(always)]
-    fn thing_count(&self) -> usize {
-        self.map_data.things().len() / THING_SIZE
-    }
-
-    #[inline(always)]
-    fn thing(&self, idx: usize) -> Thing {
-        let bytes = checked_slice(&&&self.map_data.things(), idx, THING_SIZE);
-        Thing::from(bytes)
-    }
-
-    // TODO is this needed? or only temporary?
-    #[inline(always)]
-    fn linedef_count(&self) -> usize {
-        self.map_data.linedefs().len() / LINEDEF_SIZE
-    }
-
-    #[inline(always)]
-    fn linedef(&self, idx: usize) -> LineDef {
-        let bytes = checked_slice(&self.map_data.linedefs(), idx, LINEDEF_SIZE);
-        LineDef::from(bytes, &self.map_data)
-    }
-
-    #[inline(always)]
-    fn sidedef(&self, idx: usize) -> SideDef {
-        let bytes = checked_slice(&self.map_data.sidedefs(), idx, SIDEDEF_SIZE);
-        SideDef::from(bytes)
-    }
-
-    #[inline(always)]
-    fn sector(&self, idx: usize) -> Sector {
-        let bytes = checked_slice(&self.map_data.sectors(), idx, SECTOR_SIZE);
-        Sector::from(bytes)
-    }
 }
 
 //--------------------
 //  Internal stuff
-
-struct LineDef {
-    v1: Vertex,
-    v2: Vertex,
-    flags: u16,
-    line_type: u16,
-    sector_tag: u16,
-    right_sidedef_idx: u16,
-    left_sidedef_idx: u16,
-}
-
-impl LineDef {
-    fn from(bytes: &[u8], map_data: &MapData) -> Self {
-        let vi1 = buf_to_u16(&bytes[0..2]) as usize;
-        let vi2 = buf_to_u16(&bytes[2..4]) as usize;
-        Self {
-            v1: map_data.vertex(vi1),
-            v2: map_data.vertex(vi2),
-            flags: buf_to_u16(&bytes[4..6]),
-            line_type: buf_to_u16(&bytes[6..8]),
-            sector_tag: buf_to_u16(&bytes[8..10]),
-            right_sidedef_idx: buf_to_u16(&bytes[10..12]),
-            left_sidedef_idx: buf_to_u16(&bytes[12..14]),
-        }
-    }
-}
-
-struct SideDef {
-    x_offset: i16,
-    y_offset: i16,
-    upper_texture_key: u64,
-    lower_texture_key: u64,
-    middle_texture_key: u64,
-    sector_idx: u16,
-}
-
-impl SideDef {
-    fn from(bytes: &[u8]) -> Self {
-        Self {
-            x_offset: buf_to_i16(&bytes[0..2]),
-            y_offset: buf_to_i16(&bytes[2..4]),
-            upper_texture_key: hash_lump_name(&bytes[4..12]),
-            lower_texture_key: hash_lump_name(&bytes[12..20]),
-            middle_texture_key: hash_lump_name(&bytes[20..28]),
-            sector_idx: buf_to_u16(&bytes[28..30]),
-        }
-    }
-}
-
-struct Sector {
-    floor_height: i16,
-    ceiling_height: i16,
-    floor_flat_key: u64,
-    ceiling_flat_key: u64,
-    light_level: u16,
-    special_type: u16,
-    tag_nr: u16,
-}
-
-impl Sector {
-    fn from(bytes: &[u8]) -> Self {
-        Self {
-            floor_height: buf_to_i16(&bytes[0..2]),
-            ceiling_height: buf_to_i16(&bytes[2..4]),
-            floor_flat_key: hash_lump_name(&bytes[4..12]),
-            ceiling_flat_key: hash_lump_name(&bytes[12..20]),
-            light_level: buf_to_u16(&bytes[20..22]),
-            special_type: buf_to_u16(&bytes[22..24]),
-            tag_nr: buf_to_u16(&bytes[24..26]),
-        }
-    }
-}

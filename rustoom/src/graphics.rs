@@ -1,7 +1,9 @@
 //! Handler for WAD graphics + flats
 
-use crate::utils::*;
-use crate::*;
+use crate::{
+    pixmap::{PixMap, Texture},
+    utils::*,
+};
 use bytes::Bytes;
 use std::collections::HashMap;
 
