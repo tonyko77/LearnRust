@@ -119,7 +119,7 @@ impl DoomGame {
         let ssects = self.map.bsp().locate_player(&plpos);
         let idx = self._ss_idx % ssects.len();
 
-        let segs = &ssects[idx].0;
+        let segs = &ssects[idx];
         for seg in segs.iter() {
             let v1 = self.map.translate_automap_vertex(seg.start, painter);
             let v2 = self.map.translate_automap_vertex(seg.end, painter);

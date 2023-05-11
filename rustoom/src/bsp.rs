@@ -32,10 +32,11 @@ impl BspTree {
         }
     }
 
-    pub fn locate_player(&self, player: &Vertex) -> Vec<SubSector> {
+    // TODO (later) replace Vec<Vec<Seg>> with Vec<Seg> - no reason to have a vector of vectors
+    pub fn locate_player(&self, player: &Vertex) -> Vec<Vec<Seg>> {
         let mut sect_collector = vec![];
         let start_idx = (self.node_count() - 1) as u16;
-        self.render_node(player, &mut sect_collector, start_idx);
+        self.render_node(player, start_idx, &mut sect_collector);
         sect_collector
     }
 
@@ -51,48 +52,49 @@ impl BspTree {
 
     //----------------------------
 
-    fn render_node(&self, player: &Vertex, sect_collector: &mut Vec<SubSector>, node_idx: u16) {
+    fn render_node(&self, player: &Vertex, node_idx: u16, sect_collector: &mut Vec<Vec<Seg>>) {
         if (node_idx & SSECTOR_FLAG) == 0 {
             // NOT a leaf
             let node = self.node(node_idx as usize);
             let is_on_left = node.is_point_on_left(player);
             if is_on_left {
                 // traverse LEFT first
-                self.render_node(player, sect_collector, node.left_child);
-                self.render_node(player, sect_collector, node.right_child);
+                self.render_node(player, node.left_child, sect_collector);
+                self.render_node(player, node.right_child, sect_collector);
             } else {
                 // traverse RIGHT first
-                self.render_node(player, sect_collector, node.right_child);
-                self.render_node(player, sect_collector, node.left_child);
+                self.render_node(player, node.right_child, sect_collector);
+                self.render_node(player, node.left_child, sect_collector);
             }
         } else {
             // it's a LEAF => render sector
-            let sect_idx = (node_idx & !SSECTOR_FLAG) as usize;
-            let sect = self.sub_sector(sect_idx);
+            let sect = self.render_sub_sector(node_idx);
             sect_collector.push(sect);
         }
     }
 
-    #[inline(always)]
-    pub fn node_count(&self) -> usize {
-        self.map_data.nodes().len() / 28
-    }
-
-    #[inline(always)]
-    pub fn node(&self, idx: usize) -> BspNode {
-        let bytes = checked_slice(&self.map_data.nodes(), idx, NODE_SIZE);
-        BspNode::from(bytes)
-    }
-
-    #[inline(always)]
-    fn sub_sector(&self, idx: usize) -> SubSector {
+    fn render_sub_sector(&self, sect_idx: u16) -> Vec<Seg> {
+        let idx = (sect_idx & !SSECTOR_FLAG) as usize;
         // from SSECTORS, extract the seg count and first seg index
         let bytes = checked_slice(&self.map_data.ssectors(), idx, SSECTOR_SIZE);
         let seg_count = buf_to_u16(&bytes[0..2]) as usize;
         let first_seg_idx = buf_to_u16(&bytes[2..4]) as usize;
         // from SEGS, extract each segment
         let segs = (0..seg_count).map(|idx| self.seg(first_seg_idx + idx)).collect();
-        SubSector(segs)
+        segs
+    }
+
+    // TODO temp pub !!
+    #[inline(always)]
+    pub fn node_count(&self) -> usize {
+        self.map_data.nodes().len() / 28
+    }
+
+    // TODO temp pub !!
+    #[inline(always)]
+    pub fn node(&self, idx: usize) -> BspNode {
+        let bytes = checked_slice(&self.map_data.nodes(), idx, NODE_SIZE);
+        BspNode::from(bytes)
     }
 
     #[inline(always)]
@@ -104,7 +106,7 @@ impl BspTree {
 
 //----------------------------
 
-// TODO temp pub
+// TODO temp pub-s + pub struct !!
 pub struct BspNode {
     pub vect_orig: Vertex,
     pub vect_dir: Vertex,
@@ -163,10 +165,7 @@ impl BspNode {
     }
 }
 
-// TODO temp pub
-pub struct SubSector(pub Vec<Seg>);
-
-// TODO temp pub
+// TODO temp pub-s + pub struct !!
 pub struct Seg {
     pub start: Vertex,
     pub end: Vertex,
