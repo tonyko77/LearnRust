@@ -20,16 +20,18 @@ const FLAG_AUTOMAP: u32 = 1 << 0;
 
 pub struct DoomGame {
     wad_data: WadData,
+    _screen: Screen, // TODO use this
     map_idx: usize,
     map: LevelMap,
     gameplay_flags: u32,
 }
 
 impl DoomGame {
-    pub fn new(wad_data: WadData) -> Result<DoomGame, String> {
+    pub fn new(wad_data: WadData, _screen: Screen) -> Result<DoomGame, String> {
         let map = wad_data.load_map(0);
         let mut engine = DoomGame {
             wad_data,
+            _screen,
             map_idx: 9999,
             map,
             gameplay_flags: 0,

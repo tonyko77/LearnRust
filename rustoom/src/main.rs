@@ -23,7 +23,8 @@ fn main() -> Result<(), String> {
     let wad_data = WadData::load(WAD_PATH, true)?;
 
     // build the game engine
-    let mut doom_game = DoomGame::new(wad_data)?;
+    let screen = Screen::new(SCR_WIDTH as u32, SCR_HEIGHT as u32);
+    let mut doom_game = DoomGame::new(wad_data, screen)?;
 
     // main game loop
     let sdl_config = SdlConfiguration::new("RusTooM", SCR_WIDTH, SCR_HEIGHT, PIXEL_SIZE, SLEEP_KIND);
