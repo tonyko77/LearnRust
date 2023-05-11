@@ -8,9 +8,9 @@
 
 use rustoom::*;
 
-const SCR_WIDTH: i32 = 400;
-const SCR_HEIGHT: i32 = 300;
-const PIXEL_SIZE: i32 = 3;
+const SCR_WIDTH: i32 = 480;
+const SCR_HEIGHT: i32 = 360;
+const PIXEL_SIZE: i32 = 2;
 
 const SLEEP_KIND: SleepKind = SleepKind::YIELD;
 
@@ -24,6 +24,7 @@ fn main() -> Result<(), String> {
 
     // build the game engine
     let screen = Screen::new(SCR_WIDTH as u32, SCR_HEIGHT as u32);
+    println!("{screen:?} => FOV(deg) = {}", screen.fov_deg());
     let mut doom_game = DoomGame::new(wad_data, screen)?;
 
     // main game loop

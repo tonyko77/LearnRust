@@ -1,14 +1,13 @@
 //! Screen utilities for keeping resolution info and
 //! computing based on that the FOV/aspect ratio data
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Screen {
     // TODO which of these are really needed?
     pub width: u32,
     pub height: u32,
     pub aspect_ratio: f64,
     pub dist_from_screen: f64,
-    pub half_fov_rad: f64,
     // TODO are these others needed?
     // pub fov: f32,
     // pub half_width: f32,
@@ -36,13 +35,11 @@ impl Screen {
         let aspect_ratio = wf / hf;
         let dist_from_screen = (height as f64) * 2.0 / 3.0;
         assert!(dist_from_screen > 1.0);
-        let half_fov_rad = (wf / 2.0 * dist_from_screen).atan();
         Self {
             width,
             height,
             aspect_ratio,
             dist_from_screen,
-            half_fov_rad,
         }
     }
 
@@ -53,5 +50,11 @@ impl Screen {
     pub fn screen_x_to_angle(&self, x: i32) -> f64 {
         let dx = (x - (self.width as i32 / 2)).abs() as f64;
         (dx / self.dist_from_screen).atan()
+    }
+
+    #[inline(always)]
+    pub fn fov_deg(&self) -> f64 {
+        let hfov = self.screen_x_to_angle(0);
+        hfov * 2.0 * 180.0 / std::f64::consts::PI
     }
 }
