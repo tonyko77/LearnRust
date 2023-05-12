@@ -118,7 +118,7 @@ impl PixMap {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn paint_patch(&self, x: i32, y: i32, painter: &mut dyn Painter, mapper: &dyn ColorMapper) {
         self.paint_patch_customized(
             x,

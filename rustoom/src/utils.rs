@@ -29,7 +29,7 @@ pub fn buf_to_i16_vect(buf: &[u8]) -> Vec<i16> {
     vct
 }
 
-#[inline(always)]
+#[inline]
 pub fn checked_slice(buf: &[u8], idx: usize, item_size: usize) -> &[u8] {
     let start = idx * item_size;
     let end = start + item_size;

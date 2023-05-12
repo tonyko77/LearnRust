@@ -55,43 +55,43 @@ impl MapData {
         Vertex::from_lump(&self.lumps[IDX_VERTEXES], idx)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn thing_count(&self) -> usize {
         self.lumps[IDX_THINGS].len() / THING_SIZE
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn thing(&self, idx: usize) -> Thing {
         let bytes = checked_slice(&self.lumps[IDX_THINGS], idx, THING_SIZE);
         Thing::from(bytes)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn linedef_count(&self) -> usize {
         self.lumps[IDX_LINEDEFS].len() / LINEDEF_SIZE
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn linedef(&self, idx: usize) -> LineDef {
         LineDef::from_lump(&self.lumps[IDX_LINEDEFS], idx, &self.lumps[IDX_VERTEXES])
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn sidedef(&self, idx: usize) -> SideDef {
         SideDef::from_lump(&self.lumps[IDX_SIDEDEFS], idx)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn sector(&self, idx: usize) -> Sector {
         Sector::from_lump(&self.lumps[IDX_SECTORS], idx)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn root_bsp_node_idx(&self) -> u16 {
         ((self.lumps[IDX_NODES].len() / NODE_SIZE) - 1) as u16
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn bsp_node(&self, idx: usize) -> BspNode {
         BspNode::from_lump(&self.lumps[IDX_NODES], idx)
     }

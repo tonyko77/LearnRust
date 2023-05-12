@@ -220,7 +220,7 @@ fn is_font_name(name: &str) -> bool {
     }
 }
 
-#[inline(always)]
+#[inline]
 fn is_ascii_digit(byte: u8) -> bool {
     byte >= ('0' as u8) && byte <= ('9' as u8)
 }

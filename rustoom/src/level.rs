@@ -3,7 +3,9 @@
 
 use crate::map::*;
 use crate::map_items::*;
+use crate::pixmap::Texture;
 use crate::things::Thing;
+use crate::utils::hash_lump_name;
 use crate::*;
 
 // LineDef flags
@@ -18,8 +20,8 @@ const LINE_SECRET: u16 = 0x0020;
 const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
 // Automap zoom limits
-const DEFAULT_AUTOMAP_ZOOM: f64 = 0.125;
-const AUTOMAP_ZOOM_MIN: f64 = 0.04;
+const DEFAULT_AUTOMAP_ZOOM: f64 = 0.1875;
+const AUTOMAP_ZOOM_MIN: f64 = 0.0625;
 const AUTOMAP_ZOOM_MAX: f64 = 0.750;
 
 // BSP node flag, for signaling leaf nodes, which point to sub-sectors instead of other nodes
@@ -31,6 +33,7 @@ pub struct ActiveLevel {
     player: Thing,
     amap_center: Vertex,
     amap_zoom: f64,
+    sky: Texture,
 }
 
 impl ActiveLevel {
@@ -38,12 +41,14 @@ impl ActiveLevel {
         let map_data = cfg.wad().map(map_idx).clone();
         let player = find_player_thing(&map_data);
         let amap_center = player.pos();
+        let sky = load_sky(&cfg);
         Self {
             cfg,
             map_data,
             player,
             amap_center,
             amap_zoom: DEFAULT_AUTOMAP_ZOOM,
+            sky,
         }
     }
 
@@ -61,20 +66,20 @@ impl ActiveLevel {
     }
 
     pub fn paint_3d_view(&self, painter: &mut dyn Painter) {
-        // TODO paint proper SKY for map, from graphics, based on user rotation !!
-        let w = painter.get_screen_width();
-        let h2 = painter.get_screen_height() / 2;
-        painter.fill_rect(0, 0, w, h2, CYAN);
-        painter.fill_rect(0, h2, w, h2, BROWN);
         // TODO implement this .............
+        let w = painter.get_screen_width();
+        let h = painter.get_screen_height();
+        painter.fill_rect(0, 0, w, h, CYAN);
+        // TODO properly align the sky with the player's rotation + fill the whole horizon width
+        self.sky.paint(0, 0, painter, self.cfg.palette());
     }
 
     pub fn paint_automap(&self, painter: &mut dyn Painter) {
         painter.fill_rect(0, 0, painter.get_screen_width(), painter.get_screen_height(), BLACK);
         for idx in 0..self.map_data.linedef_count() {
             let line = self.map_data.linedef(idx);
-            let v1 = self.translate_automap_vertex(line.v1, painter);
-            let v2 = self.translate_automap_vertex(line.v2, painter);
+            let v1 = self.translate_automap_vertex(line.v1);
+            let v2 = self.translate_automap_vertex(line.v2);
 
             // select color based on line type
             let f = line.flags;
@@ -113,19 +118,30 @@ impl ActiveLevel {
             //}
         }
 
-        // TODO TEMPORARY: draw the things
-        // for thing in self.get_things(0) {
-        //     let color = match thing.type_code() {
-        //         1 => WHITE,
-        //         2 => ORANGE,
-        //         3 => BLUE,
-        //         4 => GREEN,
-        //         _ => DARK_GREY,
-        //     };
-        //     self.paint_cross(painter, thing.pos(), color);
-        // }
-
-        // TODO !!! paint the player, as a white arrow
+        // paint the player, as a white arrow
+        let pos = self.player.pos();
+        let ang = self.player.angle();
+        let v1 = pos.polar_translate(25.0, ang);
+        let v2 = pos.polar_translate(18.0, -ang);
+        let v3 = pos.polar_translate(25.0, -ang);
+        self.draw_automap_line(v1, v3, WHITE, painter);
+        // draw the arrow head + fins
+        let a2 = ang + 2.7;
+        let a3 = ang - 2.7;
+        let va = v1.polar_translate(18.0, a2);
+        let vb = v1.polar_translate(18.0, a3);
+        self.draw_automap_line(v1, va, WHITE, painter);
+        self.draw_automap_line(v1, vb, WHITE, painter);
+        let a2 = ang + 2.5;
+        let a3 = ang - 2.5;
+        let va = v2.polar_translate(13.0, a2);
+        let vb = v2.polar_translate(13.0, a3);
+        self.draw_automap_line(v2, va, WHITE, painter);
+        self.draw_automap_line(v2, vb, WHITE, painter);
+        let va = v3.polar_translate(13.0, a2);
+        let vb = v3.polar_translate(13.0, a3);
+        self.draw_automap_line(v3, va, WHITE, painter);
+        self.draw_automap_line(v3, vb, WHITE, painter);
 
         // draw map name
         let txt = format!("Map: {}", self.name());
@@ -134,8 +150,8 @@ impl ActiveLevel {
         // TODO TEMPORARY: paint the subsectors
         let segs = self.locate_player(&self.player);
         for seg in segs.iter() {
-            let _v1 = self.translate_automap_vertex(seg.start, painter);
-            let _v2 = self.translate_automap_vertex(seg.end, painter);
+            let _v1 = self.translate_automap_vertex(seg.start);
+            let _v2 = self.translate_automap_vertex(seg.end);
             // TODO fix this !!!
             //painter.draw_line(v1.x, v1.y, v2.x, v2.y, GREY);
         }
@@ -153,6 +169,13 @@ impl ActiveLevel {
     //---------------
     // private methods
     //---------------
+
+    #[inline]
+    fn draw_automap_line(&self, v1: Vertex, v2: Vertex, color: RGB, painter: &mut dyn Painter) {
+        let xv1 = self.translate_automap_vertex(v1);
+        let xv2 = self.translate_automap_vertex(v2);
+        painter.draw_line(xv1.x, xv1.y, xv2.x, xv2.y, color);
+    }
 
     fn get_line_details(&self, linedef: &LineDef) -> LineDefDetails {
         let mut details = LineDefDetails {
@@ -221,13 +244,13 @@ impl ActiveLevel {
         }
     }
 
-    fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> Vertex {
+    fn translate_automap_vertex(&self, orig_vertex: Vertex) -> Vertex {
         // scale the original coordinates
         let sv = (orig_vertex - self.amap_center).fscale(self.amap_zoom);
         // translate the scaled coordinates + mirror y
         Vertex {
-            x: sv.x + (painter.get_screen_width() / 2),
-            y: (painter.get_screen_height() / 2) - sv.y,
+            x: sv.x + (self.cfg.scr_width() / 2),
+            y: (self.cfg.scr_height() / 2) - sv.y,
         }
     }
 }
@@ -251,4 +274,12 @@ fn find_player_thing(map_data: &MapData) -> Thing {
     }
     // TODO validate this upon WAD loading, so we can panic here
     panic!("No player thing found in map {}", map_data.name());
+}
+
+// TODO (later) pick the texture name based on level: https://doomwiki.org/wiki/Sky
+// (DOOM1, DOOM, DOOMU) ExMy => SKYx
+fn load_sky(cfg: &GameConfig) -> Texture {
+    let name = "SKY1";
+    let key = hash_lump_name(name.as_bytes());
+    cfg.graphics().get_texture(key).unwrap()
 }

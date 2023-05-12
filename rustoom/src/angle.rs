@@ -3,7 +3,7 @@
 use crate::map_items::Vertex;
 use std::{
     f64::consts::PI,
-    ops::{Add, Div, Mul, Sub},
+    ops::{Add, Div, Mul, Neg, Sub},
 };
 
 /// Angle representation - kept as radians, for easier trigonometry.
@@ -65,25 +65,54 @@ impl Angle {
     }
 }
 
-impl Add for Angle {
+impl Add<Self> for Angle {
     type Output = Self;
 
+    #[inline]
     fn add(self, rhs: Self) -> Self::Output {
-        Self(self.0 + rhs.0)
+        Self::from_radians(self.0 + rhs.0)
     }
 }
 
-impl Sub for Angle {
+impl Add<f64> for Angle {
     type Output = Self;
 
+    #[inline]
+    fn add(self, rhs: f64) -> Self::Output {
+        Self::from_radians(self.0 + rhs)
+    }
+}
+
+impl Sub<Self> for Angle {
+    type Output = Self;
+
+    #[inline]
     fn sub(self, rhs: Self) -> Self::Output {
-        Self(self.0 - rhs.0)
+        Self::from_radians(self.0 - rhs.0)
+    }
+}
+
+impl Sub<f64> for Angle {
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, rhs: f64) -> Self::Output {
+        Self::from_radians(self.0 - rhs)
+    }
+}
+
+impl Neg for Angle {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        Self::from_radians(self.0 + PI)
     }
 }
 
 impl Mul<f64> for Angle {
     type Output = Self;
 
+    #[inline]
     fn mul(self, rhs: f64) -> Self::Output {
         Self::from_radians(self.0 * rhs)
     }
@@ -92,6 +121,7 @@ impl Mul<f64> for Angle {
 impl Div<f64> for Angle {
     type Output = Self;
 
+    #[inline]
     fn div(self, rhs: f64) -> Self::Output {
         Self::from_radians(self.0 / rhs)
     }

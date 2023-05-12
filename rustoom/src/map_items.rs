@@ -47,6 +47,15 @@ impl Vertex {
             y: ((self.y as f64) * mul) as i32,
         }
     }
+
+    #[inline]
+    pub fn polar_translate(&self, dist: f64, angle: Angle) -> Self {
+        let (s, c) = angle.rad().sin_cos();
+        Self {
+            x: self.x + ((dist * c) as i32),
+            y: self.y + ((dist * s) as i32),
+        }
+    }
 }
 
 impl Add for Vertex {

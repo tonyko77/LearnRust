@@ -1,8 +1,7 @@
-// Main DOOM game
+//! My wacky DOOM game engine :P
 
 /*
 >> STILL TO DO <<
-    - paint the player as a WHITE ARROW
     - player real movement, on the map (noclip for now)
     - paint proper SKY for map, from graphics, based on user rotation !!
     - TEST automap correctness: draw arrow for player + use yellow/choco colors correctly.
