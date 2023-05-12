@@ -39,6 +39,14 @@ impl Vertex {
             y: self.y * mul / div,
         }
     }
+
+    #[inline]
+    pub fn fscale(&self, mul: f64) -> Self {
+        Self {
+            x: ((self.x as f64) * mul) as i32,
+            y: ((self.y as f64) * mul) as i32,
+        }
+    }
 }
 
 impl Add for Vertex {

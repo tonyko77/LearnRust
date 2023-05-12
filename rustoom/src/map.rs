@@ -20,16 +20,8 @@ const LUMP_CNT: usize = 10;
 pub struct MapData {
     name: String,
     lumps: Box<[Bytes; LUMP_CNT]>,
-}
-
-impl Clone for MapData {
-    fn clone(&self) -> Self {
-        let lumps: Box<[Bytes; LUMP_CNT]> = Box::new((*self.lumps).clone());
-        Self {
-            name: self.name.clone(),
-            lumps,
-        }
-    }
+    bound_min: Vertex,
+    bound_max: Vertex,
 }
 
 impl MapData {
@@ -38,6 +30,8 @@ impl MapData {
         Self {
             name: name.to_string(),
             lumps,
+            bound_min: Default::default(),
+            bound_max: Default::default(),
         }
     }
 
@@ -117,6 +111,13 @@ impl MapData {
         seg_collector
     }
 
+    pub fn clamp_vertex(&self, v: Vertex) -> Vertex {
+        Vertex {
+            x: v.x.clamp(self.bound_min.x, self.bound_max.x),
+            y: v.y.clamp(self.bound_min.y, self.bound_max.y),
+        }
+    }
+
     /// Use the REJECT table to check if there is line of sight between the player and the monster
     pub fn check_line_of_sight(&self, player_sect_idx: u16, monster_sect_idx: u16) -> bool {
         let sector_count = self.lumps[IDX_SECTORS].len() / SECTOR_SIZE;
@@ -146,9 +147,40 @@ impl MapData {
         // (all the lumps of one map are consecutive, so if we get an invalid one => we're done with this map)
         if idx < LUMP_CNT {
             self.lumps[idx] = bytes.clone();
+            if idx == IDX_VERTEXES {
+                self.compute_map_bounds();
+            }
             true
         } else {
             false
+        }
+    }
+
+    //----------------------------------
+
+    fn compute_map_bounds(&mut self) {
+        let mut bl = self.vertex(0);
+        let mut tr = bl;
+        for i in 1..self.vertex_count() {
+            let v = self.vertex(i);
+            bl.x = Ord::min(bl.x, v.x);
+            bl.y = Ord::min(bl.y, v.y);
+            tr.x = Ord::max(tr.x, v.x);
+            tr.y = Ord::max(tr.y, v.y);
+        }
+        self.bound_min = bl;
+        self.bound_max = tr;
+    }
+}
+
+impl Clone for MapData {
+    fn clone(&self) -> Self {
+        let lumps: Box<[Bytes; LUMP_CNT]> = Box::new((*self.lumps).clone());
+        Self {
+            name: self.name.clone(),
+            lumps,
+            bound_min: self.bound_min,
+            bound_max: self.bound_max,
         }
     }
 }

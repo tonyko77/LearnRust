@@ -19,9 +19,9 @@ const LINE_NEVER_ON_AMAP: u16 = 0x0080;
 const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
 // Automap zoom limits
-const DEFAULT_AUTOMAP_ZOOM: i32 = 12;
-const AUTOMAP_ZOOM_MIN: i32 = 5;
-const AUTOMAP_ZOOM_MAX: i32 = 60;
+const DEFAULT_AUTOMAP_ZOOM: f64 = 0.125;
+const AUTOMAP_ZOOM_MIN: f64 = 0.04;
+const AUTOMAP_ZOOM_MAX: f64 = 0.750;
 
 const SSECTOR_FLAG: u16 = 0x8000;
 
@@ -29,33 +29,19 @@ pub struct ActiveLevel {
     map_data: MapData,
     player: Thing,
     amap_center: Vertex,
-    amap_bl: Vertex,
-    amap_tr: Vertex,
-    amap_zoom: i32,
+    amap_zoom: f64,
 }
 
 impl ActiveLevel {
     pub fn new(map_data: &MapData) -> Self {
-        let mut map = Self {
+        let player = find_player_thing(map_data);
+        let amap_center = player.pos();
+        Self {
             map_data: map_data.clone(),
-            player: Default::default(),
-            amap_center: Vertex { x: 0, y: 0 },
-            amap_bl: Vertex { x: 0, y: 0 },
-            amap_tr: Vertex { x: 0, y: 0 },
+            player,
+            amap_center,
             amap_zoom: DEFAULT_AUTOMAP_ZOOM,
-        };
-        // compute bounds
-        map.compute_automap_bounds();
-        // fetch player
-        if let Some(th) = map.find_thing_by_type(1) {
-            map.amap_center = th.pos();
-            map.player = th;
-        } else {
-            // TODO improve error handling ?!
-            panic!("No player found in map's THINGS");
         }
-        // TODO map.build_bsp();
-        map
     }
 
     #[inline]
@@ -70,15 +56,20 @@ impl ActiveLevel {
             .collect()
     }
 
-    pub fn get_player(&self) -> Thing {
-        let cnt = self.map_data.thing_count();
-        (0..cnt)
-            .map(|idx| self.map_data.thing(idx))
-            .find(|th| th.type_code() == 1)
-            .expect("Player not found in map's THINGS")
+    pub fn player(&self) -> &Thing {
+        &self.player
+    }
+
+    pub fn paint_3d_view(&self, painter: &mut dyn Painter) {
+        // TODO paint a fake sky
+        let w = painter.get_screen_width();
+        let h = painter.get_screen_height();
+        painter.fill_rect(0, 0, w, h * 4 / 5, CYAN);
+        // TODO implement this
     }
 
     pub fn paint_automap(&self, painter: &mut dyn Painter, font: &Font) {
+        painter.fill_rect(0, 0, painter.get_screen_width(), painter.get_screen_height(), BLACK);
         for idx in 0..self.map_data.linedef_count() {
             let line = self.map_data.linedef(idx);
             let v1 = self.translate_automap_vertex(line.v1, painter);
@@ -116,26 +107,36 @@ impl ActiveLevel {
 
         // draw map name
         let txt = format!("Map: {}", self.name());
-        font.draw_text(3, 3, &txt, ORANGE, painter);
+        font.draw_text(3, 3, &txt, RED, painter);
+
+        // TODO TEMPORARY: paint the subsectors
+        let segs = self.locate_player(&self.player);
+        for seg in segs.iter() {
+            let v1 = self.translate_automap_vertex(seg.start, painter);
+            let v2 = self.translate_automap_vertex(seg.end, painter);
+            painter.draw_line(v1.x, v1.y, v2.x, v2.y, GREY);
+        }
     }
 
-    pub fn move_automap(&mut self, dx: i32, dy: i32) {
-        self.amap_center.x = Ord::clamp(self.amap_center.x + dx, self.amap_bl.x, self.amap_tr.x);
-        self.amap_center.y = Ord::clamp(self.amap_center.y + dy, self.amap_bl.y, self.amap_tr.y);
+    pub fn update_automap(&mut self, dx: i32, dy: i32, dzoom: f64) {
+        let new_center = Vertex {
+            x: self.amap_center.x + dx,
+            y: self.amap_center.y + dy,
+        };
+        self.amap_center = self.map_data.clamp_vertex(new_center);
+        self.amap_zoom = f64::clamp(self.amap_zoom + dzoom, AUTOMAP_ZOOM_MIN, AUTOMAP_ZOOM_MAX);
     }
 
-    pub fn zoom_automap(&mut self, dzoom: i32) {
-        self.amap_zoom = Ord::clamp(self.amap_zoom + dzoom, AUTOMAP_ZOOM_MIN, AUTOMAP_ZOOM_MAX);
-    }
+    //---------------
+    // private methods
+    //---------------
 
-    pub fn locate_player(&self, player: &Thing) -> Vec<Seg> {
+    fn locate_player(&self, player: &Thing) -> Vec<Seg> {
         let mut sect_collector = vec![];
         let start_idx = self.map_data.root_bsp_node_idx();
         self.render_node(player, start_idx, &mut sect_collector);
         sect_collector
     }
-
-    //----------------------------
 
     fn render_node(&self, player: &Thing, node_idx: u16, seg_collector: &mut Vec<Seg>) {
         if (node_idx & SSECTOR_FLAG) == 0 {
@@ -168,14 +169,9 @@ impl ActiveLevel {
         }
     }
 
-    //---------------
-    // private methods
-    //---------------
-
-    // TODO temp pub !!
-    pub fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> Vertex {
+    fn translate_automap_vertex(&self, orig_vertex: Vertex, painter: &dyn Painter) -> Vertex {
         // scale the original coordinates
-        let sv = (orig_vertex - self.amap_center).scale(self.amap_zoom, 100);
+        let sv = (orig_vertex - self.amap_center).fscale(self.amap_zoom);
         // translate the scaled coordinates + mirror y
         Vertex {
             x: sv.x + (painter.get_screen_width() / 2),
@@ -188,29 +184,18 @@ impl ActiveLevel {
         painter.draw_line(v.x - 1, v.y, v.x + 1, v.y, color);
         painter.draw_line(v.x, v.y - 1, v.x, v.y + 1, color);
     }
-
-    fn compute_automap_bounds(&mut self) {
-        self.amap_bl = self.map_data.vertex(0);
-        self.amap_tr = self.map_data.vertex(0);
-        for idx in 1..self.map_data.vertex_count() {
-            let v = self.map_data.vertex(idx);
-            self.amap_bl.x = Ord::min(self.amap_bl.x, v.x);
-            self.amap_bl.y = Ord::min(self.amap_bl.y, v.y);
-            self.amap_tr.x = Ord::max(self.amap_tr.x, v.x);
-            self.amap_tr.y = Ord::max(self.amap_tr.y, v.y);
-        }
-    }
-
-    fn find_thing_by_type(&self, thing_type: u16) -> Option<Thing> {
-        for idx in 0..self.map_data.thing_count() {
-            let th = self.map_data.thing(idx);
-            if th.type_code() == thing_type {
-                return Some(th);
-            }
-        }
-        None
-    }
 }
 
 //--------------------
 //  Internal stuff
+
+fn find_player_thing(map_data: &MapData) -> Thing {
+    for idx in 0..map_data.thing_count() {
+        let th = map_data.thing(idx);
+        if th.type_code() == 1 {
+            return th;
+        }
+    }
+    // TODO validate this upon WAD loading, so we can panic here
+    panic!("No player thing found in map {}", map_data.name());
+}
