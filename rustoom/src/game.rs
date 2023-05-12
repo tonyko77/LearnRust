@@ -18,24 +18,21 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
 // key flags - for ALL keys (some only act once on press => they need 2 bits !!)
-const KEY_TURN_LEFT: u32 = 1 << 0;
-const KEY_TURN_RIGHT: u32 = 1 << 1;
+const KEY_MOVE_FWD: u32 = 1 << 0;
+const KEY_MOVE_BACK: u32 = 1 << 1;
 const KEY_STRAFE_LEFT: u32 = 1 << 2;
 const KEY_STRAFE_RIGHT: u32 = 1 << 3;
-const KEY_MOVE_FWD: u32 = 1 << 4;
-const KEY_MOVE_BACK: u32 = 1 << 5;
-const KEY_AUTOMAP: u32 = 1 << 6;
-const KEY_AUTOMAP_ACTED: u32 = 1 << 7;
-const KEY_ZOOM_IN: u32 = 1 << 8;
-const KEY_ZOOM_OUT: u32 = 1 << 9;
-const KEY_USE: u32 = 1 << 10;
-const KEY_SHOOT: u32 = 1 << 11;
+const KEY_CURS_UP: u32 = 1 << 4;
+const KEY_CURS_DOWN: u32 = 1 << 5;
+const KEY_CURS_LEFT: u32 = 1 << 6;
+const KEY_CURS_RIGHT: u32 = 1 << 7;
+const KEY_USE: u32 = 1 << 8;
+const KEY_SHOOT: u32 = 1 << 9;
+const KEY_ZOOM_IN: u32 = 1 << 10;
+const KEY_ZOOM_OUT: u32 = 1 << 11;
 
 // other gameplay flags
 const FLAG_AUTOMAP: u32 = 1 << 0;
-
-const AMAP_MOVE_SPEED: f64 = 500.0;
-const AMAP_ZOOM_SPEED: f64 = 0.0625;
 
 pub struct DoomGame {
     cfg: GameConfig,
@@ -43,11 +40,6 @@ pub struct DoomGame {
     level: ActiveLevel,
     key_flags: u32,
     gameplay_flags: u32,
-
-    // TODO remove these and make player/amap pos a "f64" vertex !!
-    // also, move speed constants + calculations to ActiveLevel
-    amap_x_delta: f64,
-    amap_y_delta: f64,
 }
 
 impl DoomGame {
@@ -59,8 +51,6 @@ impl DoomGame {
             level,
             key_flags: 0,
             gameplay_flags: FLAG_AUTOMAP,
-            amap_x_delta: 0.0,
-            amap_y_delta: 0.0,
         };
         engine.load_map(0);
         engine.update_state(0.0);
@@ -81,13 +71,15 @@ impl GraphicsLoop for DoomGame {
         match event {
             Event::KeyDown { keycode: Some(key), .. } => {
                 match key {
-                    Keycode::Tab => self.key_flags |= KEY_AUTOMAP,
+                    Keycode::Tab => self.gameplay_flags ^= FLAG_AUTOMAP,
                     Keycode::KpPlus => self.key_flags |= KEY_ZOOM_IN,
                     Keycode::KpMinus => self.key_flags |= KEY_ZOOM_OUT,
-                    Keycode::Left => self.key_flags |= KEY_TURN_LEFT,
-                    Keycode::Right => self.key_flags |= KEY_TURN_RIGHT,
-                    Keycode::Up | Keycode::W => self.key_flags |= KEY_MOVE_FWD,
-                    Keycode::Down | Keycode::S => self.key_flags |= KEY_MOVE_BACK,
+                    Keycode::Up => self.key_flags |= KEY_CURS_UP,
+                    Keycode::Down => self.key_flags |= KEY_CURS_DOWN,
+                    Keycode::Left => self.key_flags |= KEY_CURS_LEFT,
+                    Keycode::Right => self.key_flags |= KEY_CURS_RIGHT,
+                    Keycode::W => self.key_flags |= KEY_MOVE_FWD,
+                    Keycode::S => self.key_flags |= KEY_MOVE_BACK,
                     Keycode::A => self.key_flags |= KEY_STRAFE_LEFT,
                     Keycode::D => self.key_flags |= KEY_STRAFE_RIGHT,
                     Keycode::Space | Keycode::E => self.key_flags |= KEY_USE,
@@ -110,13 +102,14 @@ impl GraphicsLoop for DoomGame {
                 }
             }
             Event::KeyUp { keycode: Some(key), .. } => match key {
-                Keycode::Tab => self.key_flags &= !(KEY_AUTOMAP | KEY_AUTOMAP_ACTED),
                 Keycode::KpPlus => self.key_flags &= !KEY_ZOOM_IN,
                 Keycode::KpMinus => self.key_flags &= !KEY_ZOOM_OUT,
-                Keycode::Left => self.key_flags &= !KEY_TURN_LEFT,
-                Keycode::Right => self.key_flags &= !KEY_TURN_RIGHT,
-                Keycode::Up | Keycode::W => self.key_flags &= !KEY_MOVE_FWD,
-                Keycode::Down | Keycode::S => self.key_flags &= !KEY_MOVE_BACK,
+                Keycode::Up => self.key_flags &= !KEY_CURS_UP,
+                Keycode::Down => self.key_flags &= !KEY_CURS_DOWN,
+                Keycode::Left => self.key_flags &= !KEY_CURS_LEFT,
+                Keycode::Right => self.key_flags &= !KEY_CURS_RIGHT,
+                Keycode::W => self.key_flags &= !KEY_MOVE_FWD,
+                Keycode::S => self.key_flags &= !KEY_MOVE_BACK,
                 Keycode::A => self.key_flags &= !KEY_STRAFE_LEFT,
                 Keycode::D => self.key_flags &= !KEY_STRAFE_RIGHT,
                 Keycode::Space | Keycode::E => self.key_flags &= KEY_USE,
@@ -129,40 +122,26 @@ impl GraphicsLoop for DoomGame {
     }
 
     fn update_state(&mut self, elapsed_time: f64) -> bool {
-        // enable/disable automap
-        if self.key_flags & (KEY_AUTOMAP | KEY_AUTOMAP_ACTED) == KEY_AUTOMAP {
-            self.gameplay_flags ^= FLAG_AUTOMAP;
-            self.key_flags |= KEY_AUTOMAP_ACTED;
-        }
-
+        // TODO cursor always rotates and moves player !!
         // update movement deltas
         if self.gameplay_flags & FLAG_AUTOMAP != 0 {
             // in automap mode
-            let mut zoom: f64 = 0.0;
-            if self.key_flags & KEY_ZOOM_IN != 0 {
-                zoom = AMAP_ZOOM_SPEED * elapsed_time;
-            }
-            if self.key_flags & KEY_ZOOM_OUT != 0 {
-                zoom = -AMAP_ZOOM_SPEED * elapsed_time;
-            }
-            if self.key_flags & (KEY_TURN_LEFT | KEY_STRAFE_LEFT) != 0 {
-                self.amap_x_delta -= AMAP_MOVE_SPEED * elapsed_time;
-            }
-            if self.key_flags & (KEY_TURN_RIGHT | KEY_STRAFE_RIGHT) != 0 {
-                self.amap_x_delta += AMAP_MOVE_SPEED * elapsed_time;
-            }
-            if self.key_flags & KEY_MOVE_FWD != 0 {
-                self.amap_y_delta += AMAP_MOVE_SPEED * elapsed_time;
-            }
-            if self.key_flags & KEY_MOVE_BACK != 0 {
-                self.amap_y_delta -= AMAP_MOVE_SPEED * elapsed_time;
-            }
-            // update automap
-            let x: i32 = self.amap_x_delta as i32;
-            let y: i32 = self.amap_y_delta as i32;
-            self.level.update_automap(x, y, zoom);
-            self.amap_x_delta -= x as f64;
-            self.amap_y_delta -= y as f64;
+            let dx = match self.key_flags & (KEY_STRAFE_LEFT | KEY_STRAFE_RIGHT) {
+                KEY_STRAFE_LEFT => -elapsed_time,
+                KEY_STRAFE_RIGHT => elapsed_time,
+                _ => 0.0,
+            };
+            let dy = match self.key_flags & (KEY_MOVE_FWD | KEY_MOVE_BACK) {
+                KEY_MOVE_FWD => elapsed_time,
+                KEY_MOVE_BACK => -elapsed_time,
+                _ => 0.0,
+            };
+            let dzoom = match self.key_flags & (KEY_ZOOM_IN | KEY_ZOOM_OUT) {
+                KEY_ZOOM_OUT => -elapsed_time,
+                KEY_ZOOM_IN => elapsed_time,
+                _ => 0.0,
+            };
+            self.level.update_automap(dx, dy, dzoom);
         } else {
             // in 3D view mode
             // TODO implement this ...

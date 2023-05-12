@@ -27,6 +27,9 @@ const AUTOMAP_ZOOM_MAX: f64 = 0.750;
 // BSP node flag, for signaling leaf nodes, which point to sub-sectors instead of other nodes
 const SSECTOR_FLAG: u16 = 0x8000;
 
+const AMAP_MOVE_SPEED: f64 = 500.0;
+const AMAP_ZOOM_SPEED: f64 = 0.0625;
+
 pub struct ActiveLevel {
     cfg: GameConfig,
     map_data: MapData,
@@ -34,12 +37,17 @@ pub struct ActiveLevel {
     amap_center: Vertex,
     amap_zoom: f64,
     sky: Texture,
+    _player_x: f64,
+    _player_y: f64,
+    amap_cx: f64,
+    amap_cy: f64,
 }
 
 impl ActiveLevel {
     pub fn new(cfg: GameConfig, map_idx: usize) -> Self {
         let map_data = cfg.wad().map(map_idx).clone();
         let player = find_player_thing(&map_data);
+        let pc = player.pos();
         let amap_center = player.pos();
         let sky = load_sky(&cfg);
         Self {
@@ -49,6 +57,10 @@ impl ActiveLevel {
             amap_center,
             amap_zoom: DEFAULT_AUTOMAP_ZOOM,
             sky,
+            _player_x: pc.x as f64,
+            _player_y: pc.y as f64,
+            amap_cx: amap_center.x as f64,
+            amap_cy: amap_center.y as f64,
         }
     }
 
@@ -157,13 +169,23 @@ impl ActiveLevel {
         }
     }
 
-    pub fn update_automap(&mut self, dx: i32, dy: i32, dzoom: f64) {
-        let new_center = Vertex {
-            x: self.amap_center.x + dx,
-            y: self.amap_center.y + dy,
-        };
-        self.amap_center = self.map_data.clamp_vertex(new_center);
-        self.amap_zoom = f64::clamp(self.amap_zoom + dzoom, AUTOMAP_ZOOM_MIN, AUTOMAP_ZOOM_MAX);
+    pub fn update_automap(&mut self, dx: f64, dy: f64, dzoom: f64) {
+        // TODO use the float values here
+        if dx != 0.0 || dy != 0.0 {
+            self.amap_cx += dx * AMAP_MOVE_SPEED;
+            self.amap_cy += dy * AMAP_MOVE_SPEED;
+            let new_center = Vertex {
+                x: self.amap_cx as i32,
+                y: self.amap_cy as i32,
+            };
+            // TODO fix this - when clamping, the float values keep going
+            // => a new struct? for float vertex ??
+            self.amap_center = self.map_data.clamp_vertex(new_center);
+        }
+        if dzoom != 0.0 {
+            let new_zoom = self.amap_zoom + dzoom * AMAP_ZOOM_SPEED;
+            self.amap_zoom = f64::clamp(new_zoom, AUTOMAP_ZOOM_MIN, AUTOMAP_ZOOM_MAX);
+        }
     }
 
     //---------------
