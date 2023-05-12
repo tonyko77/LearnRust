@@ -3,7 +3,7 @@
 
 use crate::font::Font;
 use crate::map::*;
-use crate::map_items::{Seg, Vertex};
+use crate::map_items::*;
 use crate::things::Thing;
 use crate::*;
 
@@ -15,7 +15,7 @@ const LINE_TWO_SIDED: u16 = 0x0004;
 //const LINE_LOWER_UNPEGGED: u16 = 0x0010;
 const LINE_SECRET: u16 = 0x0020;
 //const LINE_BLOCKS_SND: u16 = 0x0040;
-const LINE_NEVER_ON_AMAP: u16 = 0x0080;
+//const LINE_NEVER_ON_AMAP: u16 = 0x0080;
 const LINE_ALWAYS_ON_AMAP: u16 = 0x0100;
 
 // Automap zoom limits
@@ -23,6 +23,7 @@ const DEFAULT_AUTOMAP_ZOOM: f64 = 0.125;
 const AUTOMAP_ZOOM_MIN: f64 = 0.04;
 const AUTOMAP_ZOOM_MAX: f64 = 0.750;
 
+// BSP node flag, for signaling leaf nodes, which point to sub-sectors instead of other nodes
 const SSECTOR_FLAG: u16 = 0x8000;
 
 pub struct ActiveLevel {
@@ -79,21 +80,40 @@ impl ActiveLevel {
             let f = line.flags;
             let color = if f & LINE_SECRET != 0 {
                 CYAN
+            } else if line.special_type != 0 {
+                // TODO temporary
+                PINK
             } else if f & LINE_BLOCKS != 0 {
                 RED
             } else if f & LINE_TWO_SIDED != 0 {
-                // TODO: yellow for ceiling diff, choco for floor diff !!
-                CHOCO
+                let details = self.get_line_details(&line);
+                let s1 = details.left_sector.unwrap();
+                let s2 = details.right_sector.unwrap();
+                if s1.floor_height != s2.floor_height {
+                    // stairs => brown
+                    CHOCO
+                } else if s1.ceiling_height != s2.ceiling_height {
+                    // ceiling diff
+                    YELLOW
+                } else {
+                    BLACK
+                }
             } else if f & LINE_ALWAYS_ON_AMAP != 0 {
+                // TODO: this (and next) flags should be used for determining which lines to paint
                 WHITE
-            } else if f & LINE_NEVER_ON_AMAP != 0 {
-                DARK_GREY
+            // } else if f & LINE_NEVER_ON_AMAP != 0 {
+            //     DARK_GREY
             } else {
-                MAGENTA
+                // TODO temporary
+                PINK
             };
+
+            //if color != PINK {
             painter.draw_line(v1.x, v1.y, v2.x, v2.y, color);
+            //}
         }
-        // draw the things
+
+        // TODO TEMPORARY: draw the things
         for thing in self.get_things(0) {
             let color = match thing.type_code() {
                 1 => WHITE,
@@ -114,7 +134,7 @@ impl ActiveLevel {
         for seg in segs.iter() {
             let v1 = self.translate_automap_vertex(seg.start, painter);
             let v2 = self.translate_automap_vertex(seg.end, painter);
-            painter.draw_line(v1.x, v1.y, v2.x, v2.y, GREY);
+            // TODO fix this !!! painter.draw_line(v1.x, v1.y, v2.x, v2.y, GREY);
         }
     }
 
@@ -131,6 +151,43 @@ impl ActiveLevel {
     // private methods
     //---------------
 
+    fn get_line_details(&self, linedef: &LineDef) -> LineDefDetails {
+        let mut details = LineDefDetails {
+            left_sidedef: None,
+            left_sector: None,
+            right_sidedef: None,
+            right_sector: None,
+        };
+        if linedef.left_side_idx != 0xFFFF {
+            let side = self.map_data.sidedef(linedef.left_side_idx as usize);
+            let sect = self.map_data.sector(side.sector_idx as usize);
+            details.left_sidedef = Some(side);
+            details.left_sector = Some(sect);
+        }
+        if linedef.right_side_idx != 0xFFFF {
+            let side = self.map_data.sidedef(linedef.right_side_idx as usize);
+            let sect = self.map_data.sector(side.sector_idx as usize);
+            details.right_sidedef = Some(side);
+            details.right_sector = Some(sect);
+        }
+
+        // sanity checks
+        // TODO: these should be tested during WAD validation
+        assert!(details.left_sidedef.is_some());
+        assert!(details.left_sector.is_some());
+        if linedef.flags & LINE_TWO_SIDED == 0 {
+            // NOT 2-sided
+            assert!(details.right_sidedef.is_none());
+            assert!(details.right_sector.is_none());
+        } else {
+            // is 2-sided
+            assert!(details.right_sidedef.is_some());
+            assert!(details.right_sector.is_some());
+        }
+
+        details
+    }
+
     fn locate_player(&self, player: &Thing) -> Vec<Seg> {
         let mut sect_collector = vec![];
         let start_idx = self.map_data.root_bsp_node_idx();
@@ -142,18 +199,10 @@ impl ActiveLevel {
         if (node_idx & SSECTOR_FLAG) == 0 {
             // NOT a leaf
             let node = self.map_data.bsp_node(node_idx as usize);
-            let is_on_left = node.is_point_on_left(player.pos());
-            if is_on_left {
-                // traverse LEFT first
-                self.render_node(player, node.left_child, seg_collector);
-                // TODO? if self.check_bounding_box(player, &node.right_box_bl, &node.right_box_tr) {
-                self.render_node(player, node.right_child, seg_collector);
-            } else {
-                // traverse RIGHT first
-                self.render_node(player, node.right_child, seg_collector);
-                // TODO? if self.check_bounding_box(player, &node.left_box_bl, &node.left_box_tr) {
-                self.render_node(player, node.left_child, seg_collector);
-            }
+            let (kid1, kid2) = node.child_indices_based_on_point_pos(player.pos());
+            self.render_node(player, kid1, seg_collector);
+            // TODO? if self.check_bounding_box(player, &node.2nd_kid_box_bl, &node.2nd_kid_box_bl)
+            self.render_node(player, kid2, seg_collector);
         } else {
             // it's a LEAF => render sector
             self.render_sub_sector(node_idx, seg_collector);
@@ -188,6 +237,13 @@ impl ActiveLevel {
 
 //--------------------
 //  Internal stuff
+
+struct LineDefDetails {
+    right_sidedef: Option<SideDef>,
+    right_sector: Option<Sector>,
+    left_sidedef: Option<SideDef>,
+    left_sector: Option<Sector>,
+}
 
 fn find_player_thing(map_data: &MapData) -> Thing {
     for idx in 0..map_data.thing_count() {

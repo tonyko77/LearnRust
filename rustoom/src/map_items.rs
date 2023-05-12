@@ -77,10 +77,10 @@ pub struct LineDef {
     pub v1: Vertex,
     pub v2: Vertex,
     pub flags: u16,
-    pub line_type: u16,
+    pub special_type: u16,
     pub sector_tag: u16,
-    pub right_sidedef_idx: u16,
-    pub left_sidedef_idx: u16,
+    pub right_side_idx: u16,
+    pub left_side_idx: u16,
 }
 
 impl LineDef {
@@ -92,10 +92,10 @@ impl LineDef {
             v1: Vertex::from_lump(vertex_lump, v1_idx),
             v2: Vertex::from_lump(vertex_lump, v2_idx),
             flags: buf_to_u16(&bytes[4..6]),
-            line_type: buf_to_u16(&bytes[6..8]),
+            special_type: buf_to_u16(&bytes[6..8]),
             sector_tag: buf_to_u16(&bytes[8..10]),
-            right_sidedef_idx: buf_to_u16(&bytes[10..12]),
-            left_sidedef_idx: buf_to_u16(&bytes[12..14]),
+            right_side_idx: buf_to_u16(&bytes[10..12]),
+            left_side_idx: buf_to_u16(&bytes[12..14]),
         }
     }
 }
@@ -157,14 +157,14 @@ impl Sector {
 pub struct BspNode {
     vect_orig: Vertex,
     vect_dir: Vertex,
-    pub right_child: u16,
-    pub left_child: u16,
+    right_child: u16,
+    left_child: u16,
     // TODO use bounding boxes to optimize drawing
     // not really needed, but it would be nice to have :)
-    // _right_box_tr: Vertex,
-    // _right_box_bl: Vertex,
-    // _left_box_tr: Vertex,
-    // _left_box_bl: Vertex,
+    _right_box_tr: Vertex,
+    _right_box_bl: Vertex,
+    _left_box_tr: Vertex,
+    _left_box_bl: Vertex,
 }
 
 impl BspNode {
@@ -180,36 +180,45 @@ impl BspNode {
                 x: vect[2] as i32,
                 y: vect[3] as i32,
             },
-            // _right_box_bl: Vertex {
-            //     // TODO figure out the order of the vertices
-            //     x: Ord::min(vect[6], vect[7]) as i32,
-            //     y: Ord::min(vect[4], vect[5]) as i32,
-            // },
-            // _right_box_tr: Vertex {
-            //     // TODO figure out the order of the vertices
-            //     x: Ord::max(vect[6], vect[7]) as i32,
-            //     y: Ord::max(vect[4], vect[5]) as i32,
-            // },
-            // _left_box_bl: Vertex {
-            //     // TODO figure out the order of the vertices
-            //     x: Ord::min(vect[10], vect[11]) as i32,
-            //     y: Ord::min(vect[8], vect[9]) as i32,
-            // },
-            // _left_box_tr: Vertex {
-            //     // TODO figure out the order of the vertices
-            //     x: Ord::max(vect[10], vect[11]) as i32,
-            //     y: Ord::max(vect[8], vect[9]) as i32,
-            // },
+            _right_box_bl: Vertex {
+                // TODO figure out the order of the vertices
+                x: Ord::min(vect[6], vect[7]) as i32,
+                y: Ord::min(vect[4], vect[5]) as i32,
+            },
+            _right_box_tr: Vertex {
+                // TODO figure out the order of the vertices
+                x: Ord::max(vect[6], vect[7]) as i32,
+                y: Ord::max(vect[4], vect[5]) as i32,
+            },
+            _left_box_bl: Vertex {
+                // TODO figure out the order of the vertices
+                x: Ord::min(vect[10], vect[11]) as i32,
+                y: Ord::min(vect[8], vect[9]) as i32,
+            },
+            _left_box_tr: Vertex {
+                // TODO figure out the order of the vertices
+                x: Ord::max(vect[10], vect[11]) as i32,
+                y: Ord::max(vect[8], vect[9]) as i32,
+            },
             right_child: buf_to_u16(&bytes[24..26]),
             left_child: buf_to_u16(&bytes[26..28]),
         }
     }
 
+    /// Returns the indices of the children of this node, based on the position of a point:
+    /// * if the point is on the *left* side => returns *(left_child_idx, right_child_idx)*
+    /// * if the point is on the *right* side => returns *(right_child_idx, left_child_idx)*
     #[inline]
-    pub fn is_point_on_left(&self, point: Vertex) -> bool {
+    pub fn child_indices_based_on_point_pos(&self, point: Vertex) -> (u16, u16) {
         let pvect = point - self.vect_orig;
         let cross_product_dir = pvect.x * self.vect_dir.y - pvect.y * self.vect_dir.x;
-        cross_product_dir <= 0
+        if cross_product_dir <= 0 {
+            // vertex is on the left side
+            (self.left_child, self.right_child)
+        } else {
+            // vertex is on the right side
+            (self.right_child, self.left_child)
+        }
     }
 }
 
