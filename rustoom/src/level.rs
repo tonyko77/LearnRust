@@ -1,7 +1,6 @@
 //! An "active" level map, where all the map data is expanded and "mutable".
 //! Built from an existing MapData.
 
-use crate::font::Font;
 use crate::map::*;
 use crate::map_items::*;
 use crate::things::Thing;
@@ -27,6 +26,7 @@ const AUTOMAP_ZOOM_MAX: f64 = 0.750;
 const SSECTOR_FLAG: u16 = 0x8000;
 
 pub struct ActiveLevel {
+    cfg: GameConfig,
     map_data: MapData,
     player: Thing,
     amap_center: Vertex,
@@ -34,11 +34,13 @@ pub struct ActiveLevel {
 }
 
 impl ActiveLevel {
-    pub fn new(map_data: &MapData) -> Self {
-        let player = find_player_thing(map_data);
+    pub fn new(cfg: GameConfig, map_idx: usize) -> Self {
+        let map_data = cfg.wad().map(map_idx).clone();
+        let player = find_player_thing(&map_data);
         let amap_center = player.pos();
         Self {
-            map_data: map_data.clone(),
+            cfg,
+            map_data,
             player,
             amap_center,
             amap_zoom: DEFAULT_AUTOMAP_ZOOM,
@@ -50,26 +52,24 @@ impl ActiveLevel {
         &self.map_data.name()
     }
 
-    pub fn get_things(&self, level_filter: u8) -> Vec<Thing> {
+    // TODO is this needed ??
+    pub fn _get_things(&self, level_filter: u8) -> Vec<Thing> {
         (0..self.map_data.thing_count())
             .map(|idx| self.map_data.thing(idx))
             .filter(|th| th.is_on_skill_level(level_filter))
             .collect()
     }
 
-    pub fn player(&self) -> &Thing {
-        &self.player
-    }
-
     pub fn paint_3d_view(&self, painter: &mut dyn Painter) {
-        // TODO paint a fake sky
+        // TODO paint proper SKY for map, from graphics, based on user rotation !!
         let w = painter.get_screen_width();
-        let h = painter.get_screen_height();
-        painter.fill_rect(0, 0, w, h * 4 / 5, CYAN);
-        // TODO implement this
+        let h2 = painter.get_screen_height() / 2;
+        painter.fill_rect(0, 0, w, h2, CYAN);
+        painter.fill_rect(0, h2, w, h2, BROWN);
+        // TODO implement this .............
     }
 
-    pub fn paint_automap(&self, painter: &mut dyn Painter, font: &Font) {
+    pub fn paint_automap(&self, painter: &mut dyn Painter) {
         painter.fill_rect(0, 0, painter.get_screen_width(), painter.get_screen_height(), BLACK);
         for idx in 0..self.map_data.linedef_count() {
             let line = self.map_data.linedef(idx);
@@ -114,27 +114,30 @@ impl ActiveLevel {
         }
 
         // TODO TEMPORARY: draw the things
-        for thing in self.get_things(0) {
-            let color = match thing.type_code() {
-                1 => WHITE,
-                2 => ORANGE,
-                3 => BLUE,
-                4 => GREEN,
-                _ => DARK_GREY,
-            };
-            self.paint_cross(painter, thing.pos(), color);
-        }
+        // for thing in self.get_things(0) {
+        //     let color = match thing.type_code() {
+        //         1 => WHITE,
+        //         2 => ORANGE,
+        //         3 => BLUE,
+        //         4 => GREEN,
+        //         _ => DARK_GREY,
+        //     };
+        //     self.paint_cross(painter, thing.pos(), color);
+        // }
+
+        // TODO !!! paint the player, as a white arrow
 
         // draw map name
         let txt = format!("Map: {}", self.name());
-        font.draw_text(3, 3, &txt, RED, painter);
+        self.cfg.font().draw_text(3, 3, &txt, RED, painter);
 
         // TODO TEMPORARY: paint the subsectors
         let segs = self.locate_player(&self.player);
         for seg in segs.iter() {
-            let v1 = self.translate_automap_vertex(seg.start, painter);
-            let v2 = self.translate_automap_vertex(seg.end, painter);
-            // TODO fix this !!! painter.draw_line(v1.x, v1.y, v2.x, v2.y, GREY);
+            let _v1 = self.translate_automap_vertex(seg.start, painter);
+            let _v2 = self.translate_automap_vertex(seg.end, painter);
+            // TODO fix this !!!
+            //painter.draw_line(v1.x, v1.y, v2.x, v2.y, GREY);
         }
     }
 
@@ -226,12 +229,6 @@ impl ActiveLevel {
             x: sv.x + (painter.get_screen_width() / 2),
             y: (painter.get_screen_height() / 2) - sv.y,
         }
-    }
-
-    fn paint_cross(&self, painter: &mut dyn Painter, v: Vertex, color: RGB) {
-        let v = self.translate_automap_vertex(v, painter);
-        painter.draw_line(v.x - 1, v.y, v.x + 1, v.y, color);
-        painter.draw_line(v.x, v.y - 1, v.x, v.y + 1, color);
     }
 }
 

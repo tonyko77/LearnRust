@@ -18,13 +18,10 @@ const SLEEP_KIND: SleepKind = SleepKind::YIELD;
 const WAD_PATH: &str = "DOOM1.WAD";
 
 fn main() -> Result<(), String> {
-    // load the wad
-    let wad_data = WadData::load(WAD_PATH, true)?;
-
     // build the game engine
-    let screen = Screen::new(SCR_WIDTH as u32, SCR_HEIGHT as u32);
-    println!("{screen:?} => FOV(deg) = {}", screen.fov().deg());
-    let mut doom_game = DoomGame::new(wad_data, screen)?;
+    let wad_data = WadData::load(WAD_PATH, true)?;
+    let cfg = GameConfig::new(wad_data, SCR_WIDTH, SCR_HEIGHT);
+    let mut doom_game = DoomGame::new(cfg)?;
 
     // main game loop
     let sdl_config = SdlConfiguration::new("RusTooM", SCR_WIDTH, SCR_HEIGHT, PIXEL_SIZE, SLEEP_KIND);

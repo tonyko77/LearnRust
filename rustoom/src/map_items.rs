@@ -1,6 +1,6 @@
 //! Structs for the various items found in a map.
 
-use crate::{utils::*, Angle};
+use crate::{angle::Angle, utils::*};
 use std::ops::{Add, Sub};
 
 // Lump item sizes

@@ -1,12 +1,14 @@
 // Main DOOM game
 
 /*
-TODO:
+>> STILL TO DO <<
+    - paint the player as a WHITE ARROW
+    - player real movement, on the map (noclip for now)
+    - paint proper SKY for map, from graphics, based on user rotation !!
+    - TEST automap correctness: draw arrow for player + use yellow/choco colors correctly.
     - NEXT: limit the segs to only visible ones !!
         - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes010/notes
-    - refactor: in ActiveLevel, I need to reference stuff from Wad + Screen
-        => find a nice way to keep all constant game data (Wad, Screen, list of MapData) in a CENTRAL location
-    - automap: draw arrow for player + use yellow/choco colors correctly.
+    - player - NO LONGER move through walls
     - add Player/Actor class - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes005/notes
     - doc comments !!
  */
@@ -37,10 +39,9 @@ const AMAP_MOVE_SPEED: f64 = 500.0;
 const AMAP_ZOOM_SPEED: f64 = 0.0625;
 
 pub struct DoomGame {
-    wad_data: WadData,
-    _screen: Screen, // TODO use this
+    cfg: GameConfig,
     map_idx: usize,
-    map: ActiveLevel,
+    level: ActiveLevel,
     key_flags: u32,
     gameplay_flags: u32,
 
@@ -51,13 +52,12 @@ pub struct DoomGame {
 }
 
 impl DoomGame {
-    pub fn new(wad_data: WadData, _screen: Screen) -> Result<DoomGame, String> {
-        let map = wad_data.load_map(0);
+    pub fn new(cfg: GameConfig) -> Result<DoomGame, String> {
+        let level = ActiveLevel::new(cfg.clone(), 0);
         let mut engine = DoomGame {
-            wad_data,
-            _screen,
-            map_idx: 9999,
-            map,
+            cfg,
+            map_idx: 0,
+            level,
             key_flags: 0,
             gameplay_flags: FLAG_AUTOMAP,
             amap_x_delta: 0.0,
@@ -69,9 +69,9 @@ impl DoomGame {
     }
 
     pub fn load_map(&mut self, idx: usize) {
-        if self.map_idx != idx && idx < self.wad_data.map_count() {
+        if self.map_idx != idx && idx < self.cfg.wad().map_count() {
             self.map_idx = idx;
-            self.map = self.wad_data.load_map(idx);
+            self.level = ActiveLevel::new(self.cfg.clone(), idx);
         }
     }
 }
@@ -102,7 +102,7 @@ impl GraphicsLoop for DoomGame {
                     }
                     Keycode::PageDown => {
                         // TODO temp
-                        if self.map_idx < self.wad_data.map_count() - 1 {
+                        if self.map_idx < self.cfg.wad().map_count() - 1 {
                             let new_map_idx = self.map_idx + 1;
                             self.load_map(new_map_idx);
                         }
@@ -161,7 +161,7 @@ impl GraphicsLoop for DoomGame {
             // update automap
             let x: i32 = self.amap_x_delta as i32;
             let y: i32 = self.amap_y_delta as i32;
-            self.map.update_automap(x, y, zoom);
+            self.level.update_automap(x, y, zoom);
             self.amap_x_delta -= x as f64;
             self.amap_y_delta -= y as f64;
         } else {
@@ -176,9 +176,9 @@ impl GraphicsLoop for DoomGame {
 
     fn paint(&self, painter: &mut dyn Painter) {
         if self.gameplay_flags & FLAG_AUTOMAP != 0 {
-            self.map.paint_automap(painter, self.wad_data.font());
+            self.level.paint_automap(painter);
         } else {
-            self.map.paint_3d_view(painter);
+            self.level.paint_3d_view(painter);
         }
     }
 }

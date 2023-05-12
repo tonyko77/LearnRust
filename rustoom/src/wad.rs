@@ -3,7 +3,6 @@
 
 use crate::font::Font;
 use crate::graphics::Graphics;
-use crate::level::ActiveLevel;
 use crate::map::*;
 use crate::palette::Palette;
 use crate::*;
@@ -13,10 +12,10 @@ use std::io::Read;
 
 /// Stores all the data (lumps) from a WAD file.
 pub struct WadData {
-    pal: Palette,
     maps: Vec<MapData>,
-    font: Font,
+    pal: Palette,
     gfx: Graphics,
+    font: Font,
 }
 
 impl WadData {
@@ -44,10 +43,10 @@ impl WadData {
         }
 
         let mut wad = WadData {
-            pal: Palette::new(),
             maps: Vec::new(),
-            font: Font::new(),
+            pal: Palette::new(),
             gfx: Graphics::new(),
+            font: Font::new(),
         };
         wad.parse_wad_lumps(wad_bytes)?;
         wad.validate_collected_data()?;
@@ -72,10 +71,10 @@ impl WadData {
     }
 
     #[inline]
-    pub fn load_map(&self, idx: usize) -> ActiveLevel {
+    pub fn map(&self, idx: usize) -> &MapData {
         // TODO panic-safe error handling ?!?
         assert!(idx < self.maps.len());
-        ActiveLevel::new(&self.maps[idx])
+        &self.maps[idx]
     }
 
     #[inline]

@@ -1,8 +1,9 @@
 //! Main lib for the RustooM Doom-like engine/demo
 
-mod common;
+mod angle;
 mod font;
 mod game;
+mod gamecfg;
 mod graphics;
 mod level;
 mod map;
@@ -15,8 +16,8 @@ mod things;
 mod utils;
 mod wad;
 
-pub use common::*;
 pub use game::*;
+pub use gamecfg::*;
 pub use painter::*;
 pub use sdl_wrapper::*;
 pub use wad::*;

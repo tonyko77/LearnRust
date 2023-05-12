@@ -9,25 +9,36 @@ use std::f64::consts::PI;
 //  Deg to rad + clamp between 0 .. 2*pi
 
 fn main() {
+    const PI2: f64 = 2.0 * PI;
+    let x = PI2 + 1.0;
+    let y = x % PI2;
+    println!("x={x} => y={y}");
+    let x = 1.0 - PI2;
+    let y = x % PI2;
+    println!("x={x} => y={y}");
+
     deg_to_rad(0);
     deg_to_rad(1);
-    deg_to_rad(90);
     deg_to_rad(180);
+
     deg_to_rad(359);
     deg_to_rad(360);
-    deg_to_rad(362);
-    deg_to_rad(720);
+    deg_to_rad(361);
+
     deg_to_rad(-1);
-    deg_to_rad(-362);
-    deg_to_rad(-723);
+    deg_to_rad(-719);
+    deg_to_rad(-721);
 }
 
 fn deg_to_rad(deg: i32) -> f64 {
-    let xdeg = ((deg % 360) + if deg < 0 { 360 } else { 0 }) as f64;
-    // let xdeg = deg - (((deg / 360.0) as i32) * 360) as f64;
-    // let xdeg = if xdeg < 0.0 { xdeg + 360.0 } else { xdeg };
-    let rad = xdeg * PI / 180.0;
-    println!("Deg(in) = {deg} => Deg(out) = {xdeg} ; Rad = {rad}");
+    const PI2: f64 = 2.0 * PI;
+    let mut rad = ((deg as f64) * PI / 180.0) % PI2;
+    if rad < 0.0 {
+        rad += PI2;
+    }
+
+    let xdeg = (rad * 180.0 / PI + 0.03125) as i32;
+    println!("Deg(in) = {deg} => Rad(out) = {rad} ; Deg(out) = {xdeg}");
     rad
 }
 
