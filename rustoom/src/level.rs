@@ -1,6 +1,8 @@
 //! An "active" level map, where all the map data is expanded and "mutable".
 //! Built from an existing MapData.
 
+use std::cell::RefCell;
+
 use crate::angle::Angle;
 use crate::map::*;
 use crate::map_items::*;
@@ -35,6 +37,11 @@ const PLAYER_ROT_SPEED: f64 = 1.5;
 
 const AUTOMAP_OLD_STYLE_ARROW: bool = false;
 
+// Level Flags
+const FLAG_AUTOMAP_ON: u32 = 1 << 0;
+const FLAG_HAS_COMPUTER_MAP: u32 = 1 << 1;
+const FLAG_AUTOMAP_EXTRA_COLORS: u32 = 1 << 2;
+
 pub struct ActiveLevel {
     cfg: GameConfig,
     map_data: MapData,
@@ -46,7 +53,8 @@ pub struct ActiveLevel {
     player_y: f64,
     amap_cx: f64,
     amap_cy: f64,
-    // TODO seen_lines: Vec<u8>,
+    flags: u32,
+    seen_lines: RefCell<Vec<u8>>,
 }
 
 impl ActiveLevel {
@@ -56,7 +64,8 @@ impl ActiveLevel {
         let pc = player.pos;
         let amap_center = player.pos;
         let sky = load_sky(&cfg);
-        // TODO let seen_lines_size = (map_data.linedef_count() + 7) >> 3;
+        let seen_lines_size = (map_data.linedef_count() + 7) >> 3;
+        let flags = 0xFFFF; // TODO should be 0 in normal gameplay
         Self {
             cfg,
             map_data,
@@ -68,7 +77,8 @@ impl ActiveLevel {
             player_y: pc.y as f64,
             amap_cx: amap_center.x as f64,
             amap_cy: amap_center.y as f64,
-            // TODO seen_lines: vec![0; seen_lines_size],
+            flags,
+            seen_lines: RefCell::new(vec![0; seen_lines_size]),
         }
     }
 
@@ -77,15 +87,88 @@ impl ActiveLevel {
         &self.map_data.name()
     }
 
-    // TODO is this needed ??
-    pub fn _get_things(&self, level_filter: u8) -> Vec<Thing> {
-        (0..self.map_data.thing_count())
-            .map(|idx| self.map_data.thing(idx))
-            .filter(|th| th.is_on_skill_level(level_filter))
-            .collect()
+    pub fn move_automap_x(&mut self, dx: f64) {
+        self.amap_cx += dx * AMAP_MOVE_SPEED;
+        let (cv, was_clamped) = clamp_value(self.amap_cx as i32, self.map_data.min_x(), self.map_data.max_x());
+        self.amap_center.x = cv;
+        if was_clamped {
+            self.amap_cx = cv as f64;
+        }
     }
 
-    pub fn paint_3d_view(&self, painter: &mut dyn Painter) {
+    pub fn move_automap_y(&mut self, dy: f64) {
+        self.amap_cy += dy * AMAP_MOVE_SPEED;
+        let (cv, was_clamped) = clamp_value(self.amap_cy as i32, self.map_data.min_y(), self.map_data.max_y());
+        self.amap_center.y = cv;
+        if was_clamped {
+            self.amap_cy = cv as f64;
+        }
+    }
+
+    pub fn zoom_automap(&mut self, dzoom: f64) {
+        let new_zoom = self.amap_zoom + dzoom * AMAP_ZOOM_SPEED;
+        self.amap_zoom = f64::clamp(new_zoom, AUTOMAP_ZOOM_MIN, AUTOMAP_ZOOM_MAX);
+    }
+
+    pub fn move_player(&mut self, ellapsed_time: f64) {
+        self.translate_player(ellapsed_time, self.player.angle);
+    }
+
+    pub fn strafe_player(&mut self, ellapsed_time: f64) {
+        self.translate_player(ellapsed_time, self.player.angle - Angle::with_90_deg());
+    }
+
+    pub fn rotate_player(&mut self, ellapsed_time: f64) {
+        self.player.angle = self.player.angle + ellapsed_time * PLAYER_ROT_SPEED;
+    }
+
+    fn translate_player(&mut self, ellapsed_time: f64, angle: Angle) {
+        let (dx, dy) = float_polar_translate(ellapsed_time * PLAYER_MOVE_SPEED, angle);
+        self.player_x += dx;
+        self.player_y += dy;
+        self.player.pos = Vertex {
+            x: self.player_x as i32,
+            y: self.player_y as i32,
+        }
+    }
+
+    #[inline]
+    pub fn toggle_automap(&mut self) {
+        self.flags ^= FLAG_AUTOMAP_ON;
+    }
+
+    #[inline]
+    pub fn is_automap_on(&self) -> bool {
+        (self.flags & FLAG_AUTOMAP_ON) != 0
+    }
+
+    pub fn paint(&self, painter: &mut dyn Painter) {
+        if self.flags & FLAG_AUTOMAP_ON == 0 {
+            self.paint_3d_view(painter);
+        } else {
+            self.paint_automap(painter);
+        }
+    }
+
+    //---------------
+    // private methods
+    //---------------
+
+    fn line_was_seen(&self, line_idx: u16) {
+        let byte_idx = (line_idx as usize) >> 3;
+        let bit_mask = 1 << (line_idx & 0x07);
+        let mut vec = self.seen_lines.borrow_mut();
+        (*vec)[byte_idx] |= bit_mask;
+    }
+
+    fn was_line_seen(&self, line_idx: u16) -> bool {
+        let byte_idx = (line_idx as usize) >> 3;
+        let bit_mask = 1 << (line_idx & 0x07);
+        let vec = self.seen_lines.borrow();
+        ((*vec)[byte_idx] & bit_mask) != 0
+    }
+
+    fn paint_3d_view(&self, painter: &mut dyn Painter) {
         // TODO implement this .............
         let w = painter.get_screen_width();
         let h = painter.get_screen_height();
@@ -94,13 +177,13 @@ impl ActiveLevel {
         self.sky.paint(0, 0, painter, self.cfg.palette());
     }
 
-    pub fn paint_automap(&self, painter: &mut dyn Painter) {
+    fn paint_automap(&self, painter: &mut dyn Painter) {
         // clear the screen first
         painter.fill_rect(0, 0, painter.get_screen_width(), painter.get_screen_height(), BLACK);
         // paint the map itself
         for idx in 0..self.map_data.linedef_count() {
             let line = self.map_data.linedef(idx);
-            let color = self.pick_automap_line_color(&line);
+            let color = self.pick_automap_line_color(idx as u16, &line);
             if color != BLACK {
                 self.draw_automap_line(line.v1, line.v2, color, painter);
             }
@@ -153,6 +236,7 @@ impl ActiveLevel {
         let txt = format!("Collected SEGs: {} / {}", segs.len(), self.map_data.seg_count());
         self.cfg.font().draw_text(3, 15, &txt, GREY, painter);
         for seg in segs.iter() {
+            self.line_was_seen(seg.linedef_idx); // TODO - this should be done in 3D VIEW paint
             self.draw_automap_line(seg.start, seg.end, GREY, painter);
             // also draw segment direction ticks
             let mid = Vertex {
@@ -164,78 +248,40 @@ impl ActiveLevel {
             self.draw_automap_line(mid, m2, GREY, painter);
         }
     }
-
-    pub fn move_automap_x(&mut self, dx: f64) {
-        self.amap_cx += dx * AMAP_MOVE_SPEED;
-        let (cv, was_clamped) = clamp_value(self.amap_cx as i32, self.map_data.min_x(), self.map_data.max_x());
-        self.amap_center.x = cv;
-        if was_clamped {
-            self.amap_cx = cv as f64;
-        }
-    }
-
-    pub fn move_automap_y(&mut self, dy: f64) {
-        self.amap_cy += dy * AMAP_MOVE_SPEED;
-        let (cv, was_clamped) = clamp_value(self.amap_cy as i32, self.map_data.min_y(), self.map_data.max_y());
-        self.amap_center.y = cv;
-        if was_clamped {
-            self.amap_cy = cv as f64;
-        }
-    }
-
-    pub fn zoom_automap(&mut self, dzoom: f64) {
-        let new_zoom = self.amap_zoom + dzoom * AMAP_ZOOM_SPEED;
-        self.amap_zoom = f64::clamp(new_zoom, AUTOMAP_ZOOM_MIN, AUTOMAP_ZOOM_MAX);
-    }
-
-    pub fn move_player(&mut self, ellapsed_time: f64) {
-        self.translate_player(ellapsed_time, self.player.angle);
-    }
-
-    pub fn strafe_player(&mut self, ellapsed_time: f64) {
-        self.translate_player(ellapsed_time, self.player.angle - Angle::with_90_deg());
-    }
-
-    pub fn rotate_player(&mut self, ellapsed_time: f64) {
-        self.player.angle = self.player.angle + ellapsed_time * PLAYER_ROT_SPEED;
-    }
-
-    fn translate_player(&mut self, ellapsed_time: f64, angle: Angle) {
-        let (dx, dy) = float_polar_translate(ellapsed_time * PLAYER_MOVE_SPEED, angle);
-        self.player_x += dx;
-        self.player_y += dy;
-        self.player.pos = Vertex {
-            x: self.player_x as i32,
-            y: self.player_y as i32,
-        }
-    }
-
-    //---------------
-    // private methods
-    //---------------
-
     // select color based on line type
     // TODO some colors may be wrong, or temporary => CHECK against Crispy Doom
-    fn pick_automap_line_color(&self, line: &LineDef) -> RGB {
+    fn pick_automap_line_color(&self, line_idx: u16, line: &LineDef) -> RGB {
         let f = line.flags;
+        let extras = (self.flags & FLAG_AUTOMAP_EXTRA_COLORS) != 0;
 
-        if f & LINE_SECRET != 0 {
-            // TODO temporary - highlight secrets
-            // (later, use cyan for not-yet-seen lines)
-            return CYAN;
-        }
-        if line.special_type != 0 {
-            // TODO temporary - highlight actionable lines
-            return BLUE;
-        }
-
-        if f & LINE_ALWAYS_ON_AMAP != 0 {
-            // TODO: this (and next) flags should be used for determining which lines to paint
-            return WHITE;
-        }
-        if f & LINE_NEVER_ON_AMAP != 0 {
-            // quick return, for lines that should NOT appear on automap
+        // quick return, for lines that should NOT appear on automap
+        let dont_show = (f & LINE_NEVER_ON_AMAP) != 0;
+        if dont_show && !extras {
             return BLACK;
+        }
+        // quick return, for lines that were not yet seen
+        let was_seen = (f & LINE_ALWAYS_ON_AMAP) != 0 || self.was_line_seen(line_idx);
+        if !was_seen {
+            if (self.flags & FLAG_HAS_COMPUTER_MAP) == 0 {
+                return BLACK;
+            } else {
+                return CYAN;
+            }
+        }
+
+        if extras {
+            // highlight secrets
+            if f & LINE_SECRET != 0 {
+                return GREEN;
+            }
+            // highlight actionable lines
+            if line.special_type != 0 {
+                return BLUE;
+            }
+            // if non-special and invisible
+            if dont_show {
+                return BLACK;
+            }
         }
 
         if f & LINE_TWO_SIDED != 0 {

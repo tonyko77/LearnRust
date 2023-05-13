@@ -29,15 +29,11 @@ const KEY_SHOOT: u32 = 1 << 9;
 const KEY_ZOOM_IN: u32 = 1 << 10;
 const KEY_ZOOM_OUT: u32 = 1 << 11;
 
-// other gameplay flags
-const FLAG_AUTOMAP: u32 = 1 << 0;
-
 pub struct DoomGame {
     cfg: GameConfig,
     map_idx: usize,
     level: ActiveLevel,
     key_flags: u32,
-    gameplay_flags: u32,
 }
 
 impl DoomGame {
@@ -48,7 +44,6 @@ impl DoomGame {
             map_idx: 0,
             level,
             key_flags: 0,
-            gameplay_flags: FLAG_AUTOMAP,
         };
         engine.load_map(0);
         engine.update_state(0.0);
@@ -69,7 +64,7 @@ impl GraphicsLoop for DoomGame {
         match event {
             Event::KeyDown { keycode: Some(key), .. } => {
                 match key {
-                    Keycode::Tab => self.gameplay_flags ^= FLAG_AUTOMAP,
+                    Keycode::Tab => self.level.toggle_automap(),
                     Keycode::KpPlus => self.key_flags |= KEY_ZOOM_IN,
                     Keycode::KpMinus => self.key_flags |= KEY_ZOOM_OUT,
                     Keycode::Up => self.key_flags |= KEY_CURS_UP,
@@ -133,19 +128,7 @@ impl GraphicsLoop for DoomGame {
         }
 
         // automap vs player specific movements
-        if self.gameplay_flags & FLAG_AUTOMAP == 0 {
-            // in 3D view mode
-            match self.key_flags & (KEY_STRAFE_LEFT | KEY_STRAFE_RIGHT) {
-                KEY_STRAFE_LEFT => self.level.strafe_player(-elapsed_time),
-                KEY_STRAFE_RIGHT => self.level.strafe_player(elapsed_time),
-                _ => {}
-            }
-            match self.key_flags & (KEY_MOVE_FWD | KEY_MOVE_BACK) {
-                KEY_MOVE_FWD => self.level.move_player(elapsed_time),
-                KEY_MOVE_BACK => self.level.move_player(-elapsed_time),
-                _ => {}
-            }
-        } else {
+        if self.level.is_automap_on() {
             // in automap mode
             match self.key_flags & (KEY_STRAFE_LEFT | KEY_STRAFE_RIGHT) {
                 KEY_STRAFE_LEFT => self.level.move_automap_x(-elapsed_time),
@@ -162,16 +145,24 @@ impl GraphicsLoop for DoomGame {
                 KEY_ZOOM_OUT => self.level.zoom_automap(-elapsed_time),
                 _ => {}
             }
+        } else {
+            // in 3D view mode
+            match self.key_flags & (KEY_STRAFE_LEFT | KEY_STRAFE_RIGHT) {
+                KEY_STRAFE_LEFT => self.level.strafe_player(-elapsed_time),
+                KEY_STRAFE_RIGHT => self.level.strafe_player(elapsed_time),
+                _ => {}
+            }
+            match self.key_flags & (KEY_MOVE_FWD | KEY_MOVE_BACK) {
+                KEY_MOVE_FWD => self.level.move_player(elapsed_time),
+                KEY_MOVE_BACK => self.level.move_player(-elapsed_time),
+                _ => {}
+            }
         }
 
         true
     }
 
     fn paint(&self, painter: &mut dyn Painter) {
-        if self.gameplay_flags & FLAG_AUTOMAP != 0 {
-            self.level.paint_automap(painter);
-        } else {
-            self.level.paint_3d_view(painter);
-        }
+        self.level.paint(painter);
     }
 }
