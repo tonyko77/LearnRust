@@ -13,6 +13,16 @@ pub struct Angle(f64);
 
 impl Angle {
     #[inline]
+    pub fn with_90_deg() -> Self {
+        Self(PI * 0.5)
+    }
+
+    #[inline]
+    pub fn with_180_deg() -> Self {
+        Self(PI)
+    }
+
+    #[inline]
     pub fn from_radians(rad: f64) -> Self {
         const PI2: f64 = 2.0 * PI;
         let rad = rad % PI2;

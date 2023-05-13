@@ -1,12 +1,12 @@
 //! My wacky DOOM game engine :P
 
 /*
->> STILL TO DO <<
-    - NEXT: limit the segs to only visible ones !!
-        - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes010/notes
+STILL TO DO:
+    - continue DIY: https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes011/notes
+
+NICE TO HAVE:
     - player - NO LONGER move through walls
     - paint proper SKY for map, from graphics, based on user rotation !!
-    - add Player/Actor class - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes005/notes
     - doc comments !!
  */
 

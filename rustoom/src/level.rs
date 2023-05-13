@@ -1,14 +1,12 @@
 //! An "active" level map, where all the map data is expanded and "mutable".
 //! Built from an existing MapData.
 
-use std::f64::consts::PI;
-
 use crate::angle::Angle;
 use crate::map::*;
 use crate::map_items::*;
 use crate::pixmap::Texture;
 use crate::things::Thing;
-use crate::utils::hash_lump_name;
+use crate::utils::*;
 use crate::*;
 
 // LineDef flags
@@ -34,6 +32,8 @@ const AMAP_MOVE_SPEED: f64 = 800.0;
 const AMAP_ZOOM_SPEED: f64 = 0.0625;
 const PLAYER_MOVE_SPEED: f64 = 200.0;
 const PLAYER_ROT_SPEED: f64 = 1.5;
+
+const AUTOMAP_OLD_STYLE_ARROW: bool = false;
 
 pub struct ActiveLevel {
     cfg: GameConfig,
@@ -64,7 +64,6 @@ impl ActiveLevel {
             amap_center,
             amap_zoom: DEFAULT_AUTOMAP_ZOOM,
             sky,
-            // TODO: use a FloatVertex structure, that supports translation and rotation
             player_x: pc.x as f64,
             player_y: pc.y as f64,
             amap_cx: amap_center.x as f64,
@@ -110,37 +109,49 @@ impl ActiveLevel {
         // paint the player, as a white arrow
         let pos = self.player.pos;
         let ang = self.player.angle;
-        let v1 = pos.polar_translate(25.0, ang);
-        let v2 = pos.polar_translate(18.0, -ang);
-        let v3 = pos.polar_translate(25.0, -ang);
-        self.draw_automap_line(v1, v3, WHITE, painter);
-        // draw the arrow head + fins
-        let a2 = ang + 2.7;
-        let a3 = ang - 2.7;
-        let va = v1.polar_translate(18.0, a2);
-        let vb = v1.polar_translate(18.0, a3);
-        self.draw_automap_line(v1, va, WHITE, painter);
-        self.draw_automap_line(v1, vb, WHITE, painter);
-        let a2 = ang + 2.5;
-        let a3 = ang - 2.5;
-        let va = v2.polar_translate(13.0, a2);
-        let vb = v2.polar_translate(13.0, a3);
-        self.draw_automap_line(v2, va, WHITE, painter);
-        self.draw_automap_line(v2, vb, WHITE, painter);
-        let va = v3.polar_translate(13.0, a2);
-        let vb = v3.polar_translate(13.0, a3);
-        self.draw_automap_line(v3, va, WHITE, painter);
-        self.draw_automap_line(v3, vb, WHITE, painter);
-        // my "personal touch": a small dot, where the player's position actually is
-        let p = self.translate_automap_vertex(pos);
-        painter.fill_circle(p.x, p.y, 1, GREEN);
+        if AUTOMAP_OLD_STYLE_ARROW {
+            let v1 = pos.polar_translate(25.0, ang);
+            let v2 = pos.polar_translate(18.0, -ang);
+            let v3 = pos.polar_translate(25.0, -ang);
+            self.draw_automap_line(v1, v3, WHITE, painter);
+            // draw the arrow head + fins
+            let a2 = ang + 2.7;
+            let a3 = ang - 2.7;
+            let va = v1.polar_translate(18.0, a2);
+            let vb = v1.polar_translate(18.0, a3);
+            self.draw_automap_line(v1, va, WHITE, painter);
+            self.draw_automap_line(v1, vb, WHITE, painter);
+            let a2 = ang + 2.5;
+            let a3 = ang - 2.5;
+            let va = v2.polar_translate(13.0, a2);
+            let vb = v2.polar_translate(13.0, a3);
+            self.draw_automap_line(v2, va, WHITE, painter);
+            self.draw_automap_line(v2, vb, WHITE, painter);
+            let va = v3.polar_translate(13.0, a2);
+            let vb = v3.polar_translate(13.0, a3);
+            self.draw_automap_line(v3, va, WHITE, painter);
+            self.draw_automap_line(v3, vb, WHITE, painter);
+        } else {
+            // a dot at the player's actual position
+            let p = self.translate_automap_vertex(pos);
+            painter.fill_rect(p.x - 1, p.y - 1, 3, 3, GREEN);
+            // a line towards the player direction
+            let v = pos.polar_translate(40.0, ang);
+            self.draw_automap_line(pos, v, WHITE, painter);
+        }
 
         // text with the map name
         let txt = format!("Map: {}", self.name());
         self.cfg.font().draw_text(3, 3, &txt, RED, painter);
 
-        // TODO TEMPORARY: paint the visible sub-sector segments
+        self.temp_paint_segs(painter);
+    }
+
+    // TODO TEMPORARY: collect and paint the visible SEG-s
+    fn temp_paint_segs(&self, painter: &mut dyn Painter) {
         let segs = self.player_visible_segments(&self.player);
+        let txt = format!("Collected SEGs: {} / {}", segs.len(), self.map_data.seg_count());
+        self.cfg.font().draw_text(3, 15, &txt, GREY, painter);
         for seg in segs.iter() {
             self.draw_automap_line(seg.start, seg.end, GREY, painter);
             // also draw segment direction ticks
@@ -148,7 +159,7 @@ impl ActiveLevel {
                 x: (seg.start.x + seg.end.x) / 2,
                 y: (seg.start.y + seg.end.y) / 2,
             };
-            let a = Angle::from_vector(seg.start, seg.end) - Angle::from_radians(PI * 0.5);
+            let a = Angle::from_vector(seg.start, seg.end) - Angle::with_90_deg();
             let m2 = mid.polar_translate(20.0, a);
             self.draw_automap_line(mid, m2, GREY, painter);
         }
@@ -182,7 +193,7 @@ impl ActiveLevel {
     }
 
     pub fn strafe_player(&mut self, ellapsed_time: f64) {
-        self.translate_player(ellapsed_time, self.player.angle - (PI * 0.5));
+        self.translate_player(ellapsed_time, self.player.angle - Angle::with_90_deg());
     }
 
     pub fn rotate_player(&mut self, ellapsed_time: f64) {
@@ -350,7 +361,7 @@ impl ActiveLevel {
         }
         // drop segments which are oriented AWAY from the player
         let span_v1_to_v2 = a1 - a2;
-        if span_v1_to_v2 >= Angle::from_radians(PI) {
+        if span_v1_to_v2 >= Angle::with_180_deg() {
             return false;
         }
 

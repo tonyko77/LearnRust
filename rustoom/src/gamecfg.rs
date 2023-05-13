@@ -57,7 +57,7 @@ impl GameConfig {
 
     #[inline]
     pub fn half_fov(&self) -> Angle {
-        self.screen_x_to_angle(self.0.scr_width as i32)
+        self.screen_x_to_angle(0)
     }
 
     #[inline]
@@ -67,12 +67,10 @@ impl GameConfig {
         wf / hf
     }
 
-    // TODO: is this used as is? do I need to make it abs()?
-    // or should I make angle positive towards left and negative towards right?
     #[inline]
-    pub fn screen_x_to_angle(&self, x: i32) -> Angle {
-        let dx = (x - (self.0.scr_width as i32 / 2)).abs() as f64;
-        let rad = (dx / self.0.dist_from_screen).atan();
+    pub fn screen_x_to_angle(&self, screen_x: i32) -> Angle {
+        let dx = ((self.0.scr_width / 2) - screen_x) as f64;
+        let rad = dx.atan2(self.0.dist_from_screen);
         Angle::from_radians(rad)
     }
 }

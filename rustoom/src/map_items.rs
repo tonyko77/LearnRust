@@ -168,12 +168,6 @@ pub struct BspNode {
     vect_dir: Vertex,
     right_child: u16,
     left_child: u16,
-    // TODO use bounding boxes to optimize drawing
-    // not really needed, but it would be nice to have :)
-    _right_box_tr: Vertex,
-    _right_box_bl: Vertex,
-    _left_box_tr: Vertex,
-    _left_box_bl: Vertex,
 }
 
 impl BspNode {
@@ -188,26 +182,6 @@ impl BspNode {
             vect_dir: Vertex {
                 x: vect[2] as i32,
                 y: vect[3] as i32,
-            },
-            _right_box_bl: Vertex {
-                // TODO figure out the order of the vertices
-                x: Ord::min(vect[6], vect[7]) as i32,
-                y: Ord::min(vect[4], vect[5]) as i32,
-            },
-            _right_box_tr: Vertex {
-                // TODO figure out the order of the vertices
-                x: Ord::max(vect[6], vect[7]) as i32,
-                y: Ord::max(vect[4], vect[5]) as i32,
-            },
-            _left_box_bl: Vertex {
-                // TODO figure out the order of the vertices
-                x: Ord::min(vect[10], vect[11]) as i32,
-                y: Ord::min(vect[8], vect[9]) as i32,
-            },
-            _left_box_tr: Vertex {
-                // TODO figure out the order of the vertices
-                x: Ord::max(vect[10], vect[11]) as i32,
-                y: Ord::max(vect[8], vect[9]) as i32,
             },
             right_child: buf_to_u16(&bytes[24..26]),
             left_child: buf_to_u16(&bytes[26..28]),
