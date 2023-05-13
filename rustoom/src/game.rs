@@ -2,7 +2,8 @@
 
 /*
 STILL TO DO:
-    - continue DIY: https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes011/notes
+    - I MUST TAKE A BREAK !!!!!!!!!!
+    - continue DIY: https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes012/notes
 
 NICE TO HAVE:
     - player - NO LONGER move through walls

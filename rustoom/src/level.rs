@@ -185,8 +185,8 @@ impl ActiveLevel {
             // TODO render the seg CORRECTLY !
             let a1 = Angle::from_vector(ppos, seg.start) - self.player.angle;
             let a2 = Angle::from_vector(ppos, seg.end) - self.player.angle;
-            let (x1, _v1) = self.angle_to_x(a1, true);
-            let (x2, _v2) = self.angle_to_x(a2, false);
+            let (x1, _v1, clipped_1) = self.view_angle_to_x(a1, true);
+            let (x2, _v2, clipped_2) = self.view_angle_to_x(a2, false);
             for x in x1..x2 {
                 if x < 0 || x >= (width as i32) {
                     continue;
@@ -206,6 +206,9 @@ impl ActiveLevel {
             } else {
                 dbg_color = 0;
             }
+            // TODO TEMP: also draw lines for each seg's edges
+            painter.draw_line(x1, 50, x1, 60, if clipped_1 { PINK } else { RED });
+            painter.draw_line(x2, 60, x2, 70, if clipped_2 { BLUE } else { GREEN });
         }
 
         // TODO - TEMP message
@@ -213,8 +216,8 @@ impl ActiveLevel {
         self.cfg.font().draw_text(3, 15, &txt, WHITE, painter);
     }
 
-    // TODO this is kinda hacky + not very efficient - but if it works, it's OK :))
-    fn angle_to_x(&self, angle: Angle, _is_start: bool) -> (i32, Angle) {
+    // TODO this is kinda hacky + not very efficient, but if it works, it's OK :))
+    fn view_angle_to_x(&self, angle: Angle, _is_start: bool) -> (i32, Angle, bool) {
         let w = self.cfg.scr_width();
         let hfov = self.cfg.half_fov();
         let minus_hfov = hfov * (-1.0);
@@ -222,13 +225,13 @@ impl ActiveLevel {
             // in view
             let dist = self.cfg.dist_from_screen();
             let dx = (angle.rad().tan() * dist) as i32;
-            (w / 2 - dx, angle)
+            (w / 2 - dx, angle, false)
         } else if angle < Angle::with_180_deg() {
             // out of view, left edge
-            (0, hfov)
+            (0, hfov, true)
         } else {
             // out of view, right edge
-            (w - 1, minus_hfov)
+            (w - 1, minus_hfov, true)
         }
     }
 
