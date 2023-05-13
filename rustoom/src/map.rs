@@ -96,6 +96,11 @@ impl MapData {
         BspNode::from_lump(&self.lumps[IDX_NODES], idx)
     }
 
+    #[inline]
+    pub fn seg_count(&self) -> usize {
+        self.lumps[IDX_SEGS].len() / SEG_SIZE
+    }
+
     pub fn sub_sector(&self, idx: usize) -> Vec<Seg> {
         // from SSECTORS, extract the seg count and first seg index
         let bytes = checked_slice(&self.lumps[IDX_SSECTORS], idx, SSECTOR_SIZE);

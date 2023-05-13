@@ -46,6 +46,7 @@ pub struct ActiveLevel {
     player_y: f64,
     amap_cx: f64,
     amap_cy: f64,
+    // TODO seen_lines: Vec<u8>,
 }
 
 impl ActiveLevel {
@@ -55,6 +56,7 @@ impl ActiveLevel {
         let pc = player.pos;
         let amap_center = player.pos;
         let sky = load_sky(&cfg);
+        // TODO let seen_lines_size = (map_data.linedef_count() + 7) >> 3;
         Self {
             cfg,
             map_data,
@@ -67,6 +69,7 @@ impl ActiveLevel {
             player_y: pc.y as f64,
             amap_cx: amap_center.x as f64,
             amap_cy: amap_center.y as f64,
+            // TODO seen_lines: vec![0; seen_lines_size],
         }
     }
 
@@ -128,18 +131,26 @@ impl ActiveLevel {
         let vb = v3.polar_translate(13.0, a3);
         self.draw_automap_line(v3, va, WHITE, painter);
         self.draw_automap_line(v3, vb, WHITE, painter);
+        // my "personal touch": a small dot, where the player's position actually is
+        let p = self.translate_automap_vertex(pos);
+        painter.fill_circle(p.x, p.y, 1, GREEN);
 
         // text with the map name
         let txt = format!("Map: {}", self.name());
         self.cfg.font().draw_text(3, 3, &txt, RED, painter);
 
-        // TODO TEMPORARY: paint the subsectors
-        let segs = self.locate_player(&self.player);
+        // TODO TEMPORARY: paint the visible sub-sector segments
+        let segs = self.player_visible_segments(&self.player);
         for seg in segs.iter() {
-            let _v1 = self.translate_automap_vertex(seg.start);
-            let _v2 = self.translate_automap_vertex(seg.end);
-            // TODO fix this !!!
-            //painter.draw_line(v1.x, v1.y, v2.x, v2.y, GREY);
+            self.draw_automap_line(seg.start, seg.end, GREY, painter);
+            // also draw segment direction ticks
+            let mid = Vertex {
+                x: (seg.start.x + seg.end.x) / 2,
+                y: (seg.start.y + seg.end.y) / 2,
+            };
+            let a = Angle::from_vector(seg.start, seg.end) - Angle::from_radians(PI * 0.5);
+            let m2 = mid.polar_translate(20.0, a);
+            self.draw_automap_line(mid, m2, GREY, painter);
         }
     }
 
@@ -241,11 +252,20 @@ impl ActiveLevel {
         PINK
     }
 
-    #[inline]
     fn draw_automap_line(&self, v1: Vertex, v2: Vertex, color: RGB, painter: &mut dyn Painter) {
         let xv1 = self.translate_automap_vertex(v1);
         let xv2 = self.translate_automap_vertex(v2);
         painter.draw_line(xv1.x, xv1.y, xv2.x, xv2.y, color);
+    }
+
+    fn translate_automap_vertex(&self, orig_vertex: Vertex) -> Vertex {
+        // scale the original coordinates
+        let sv = (orig_vertex - self.amap_center).fscale(self.amap_zoom);
+        // translate the scaled coordinates + mirror y
+        Vertex {
+            x: sv.x + (self.cfg.scr_width() / 2),
+            y: (self.cfg.scr_height() / 2) - sv.y,
+        }
     }
 
     fn get_line_details(&self, linedef: &LineDef) -> LineDefDetails {
@@ -285,8 +305,8 @@ impl ActiveLevel {
         details
     }
 
-    fn locate_player(&self, player: &Thing) -> Vec<Seg> {
-        let mut sect_collector = vec![];
+    fn player_visible_segments(&self, player: &Thing) -> Vec<Seg> {
+        let mut sect_collector = Vec::with_capacity(self.map_data.seg_count() >> 1);
         let start_idx = self.map_data.root_bsp_node_idx();
         self.render_node(player, start_idx, &mut sect_collector);
         sect_collector
@@ -308,21 +328,43 @@ impl ActiveLevel {
 
     fn render_sub_sector(&self, sect_idx: u16, seg_collector: &mut Vec<Seg>) {
         let idx = (sect_idx & !SSECTOR_FLAG) as usize;
-        let segs = self.map_data.sub_sector(idx);
-        for s in segs {
-            // TODO render each segment
-            seg_collector.push(s);
+        let sub_sector_segs = self.map_data.sub_sector(idx);
+        for seg in sub_sector_segs {
+            if self.is_seg_in_player_fov(&seg) {
+                seg_collector.push(seg);
+            }
         }
     }
 
-    fn translate_automap_vertex(&self, orig_vertex: Vertex) -> Vertex {
-        // scale the original coordinates
-        let sv = (orig_vertex - self.amap_center).fscale(self.amap_zoom);
-        // translate the scaled coordinates + mirror y
-        Vertex {
-            x: sv.x + (self.cfg.scr_width() / 2),
-            y: (self.cfg.scr_height() / 2) - sv.y,
+    // TODO I have simplified things, compared to DIY DOOM
+    // -> see: https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes010/notes
+    // I don't care about clipped angles
+    fn is_seg_in_player_fov(&self, seg: &Seg) -> bool {
+        // compute the initial, real-world angles from the player to the 2 edges of the SEG
+        let a1 = Angle::from_vector(self.player.pos, seg.start);
+        let a2 = Angle::from_vector(self.player.pos, seg.end);
+
+        // drop segments which are "orthogonal" to the player's view
+        if a1 == a2 {
+            return false;
         }
+        // drop segments which are oriented AWAY from the player
+        let span_v1_to_v2 = a1 - a2;
+        if span_v1_to_v2 >= Angle::from_radians(PI) {
+            return false;
+        }
+
+        // prepare some useful data
+        let half_fov = self.cfg.half_fov();
+        let full_fov = half_fov * 2.0;
+        // rotate angles, so that they're relative to player's angle + move FOV to range 0..full_fov
+        let a1 = a1 - self.player.angle + half_fov;
+        let a2 = a2 - self.player.angle + half_fov;
+
+        // segment MAY BE visible if:
+        //  - at least one segment edge is within player's fov
+        //  - both edges are outside player's FOV
+        a1 < full_fov || a2 < full_fov || a1 < (full_fov + span_v1_to_v2)
     }
 }
 

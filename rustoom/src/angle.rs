@@ -37,21 +37,12 @@ impl Angle {
 
     #[inline]
     pub fn from_vector(orig: Vertex, dir: Vertex) -> Self {
-        Self::from_vector_delta(dir.x - orig.x, dir.y - orig.y)
+        Self::from_vector_delta((dir.x - orig.x) as f64, (dir.y - orig.y) as f64)
     }
 
     #[inline]
-    pub fn from_vector_delta(dx: i32, dy: i32) -> Self {
-        if dx != 0 {
-            // safe to use arctan
-            Self::from_radians(((dy as f64) / (dx as f64)).atan())
-        } else if dy > 0 {
-            // vector points straight up => 90 degrees, or 1/2 PI
-            Self(PI * 0.5)
-        } else {
-            // vector points straight down => 270 degrees, or 3/2 PI
-            Self(PI * 1.5)
-        }
+    pub fn from_vector_delta(dx: f64, dy: f64) -> Self {
+        Self::from_radians(dy.atan2(dx))
     }
 
     #[inline]
