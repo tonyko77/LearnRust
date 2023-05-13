@@ -111,11 +111,24 @@ impl MapData {
         seg_collector
     }
 
-    pub fn clamp_vertex(&self, v: Vertex) -> Vertex {
-        Vertex {
-            x: v.x.clamp(self.bound_min.x, self.bound_max.x),
-            y: v.y.clamp(self.bound_min.y, self.bound_max.y),
-        }
+    #[inline]
+    pub fn min_x(&self) -> i32 {
+        self.bound_min.x
+    }
+
+    #[inline]
+    pub fn min_y(&self) -> i32 {
+        self.bound_min.y
+    }
+
+    #[inline]
+    pub fn max_x(&self) -> i32 {
+        self.bound_max.x
+    }
+
+    #[inline]
+    pub fn max_y(&self) -> i32 {
+        self.bound_max.y
     }
 
     /// Use the REJECT table to check if there is line of sight between the player and the monster

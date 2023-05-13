@@ -2,12 +2,10 @@
 
 /*
 >> STILL TO DO <<
-    - player real movement, on the map (noclip for now)
-    - paint proper SKY for map, from graphics, based on user rotation !!
-    - TEST automap correctness: draw arrow for player + use yellow/choco colors correctly.
     - NEXT: limit the segs to only visible ones !!
         - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes010/notes
     - player - NO LONGER move through walls
+    - paint proper SKY for map, from graphics, based on user rotation !!
     - add Player/Actor class - see https://github.com/amroibrahim/DIYDoom/tree/master/DIYDOOM/Notes005/notes
     - doc comments !!
  */
@@ -122,32 +120,49 @@ impl GraphicsLoop for DoomGame {
     }
 
     fn update_state(&mut self, elapsed_time: f64) -> bool {
-        // TODO cursor always rotates and moves player !!
-        // update movement deltas
-        if self.gameplay_flags & FLAG_AUTOMAP != 0 {
-            // in automap mode
-            let dx = match self.key_flags & (KEY_STRAFE_LEFT | KEY_STRAFE_RIGHT) {
-                KEY_STRAFE_LEFT => -elapsed_time,
-                KEY_STRAFE_RIGHT => elapsed_time,
-                _ => 0.0,
-            };
-            let dy = match self.key_flags & (KEY_MOVE_FWD | KEY_MOVE_BACK) {
-                KEY_MOVE_FWD => elapsed_time,
-                KEY_MOVE_BACK => -elapsed_time,
-                _ => 0.0,
-            };
-            let dzoom = match self.key_flags & (KEY_ZOOM_IN | KEY_ZOOM_OUT) {
-                KEY_ZOOM_OUT => -elapsed_time,
-                KEY_ZOOM_IN => elapsed_time,
-                _ => 0.0,
-            };
-            self.level.update_automap(dx, dy, dzoom);
-        } else {
-            // in 3D view mode
-            // TODO implement this ...
+        // cursor always rotates and moves player
+        match self.key_flags & (KEY_CURS_LEFT | KEY_CURS_RIGHT) {
+            KEY_CURS_LEFT => self.level.rotate_player(elapsed_time),
+            KEY_CURS_RIGHT => self.level.rotate_player(-elapsed_time),
+            _ => {}
+        }
+        match self.key_flags & (KEY_CURS_UP | KEY_CURS_DOWN) {
+            KEY_CURS_UP => self.level.move_player(elapsed_time),
+            KEY_CURS_DOWN => self.level.move_player(-elapsed_time),
+            _ => {}
         }
 
-        // update view
+        // automap vs player specific movements
+        if self.gameplay_flags & FLAG_AUTOMAP == 0 {
+            // in 3D view mode
+            match self.key_flags & (KEY_STRAFE_LEFT | KEY_STRAFE_RIGHT) {
+                KEY_STRAFE_LEFT => self.level.strafe_player(-elapsed_time),
+                KEY_STRAFE_RIGHT => self.level.strafe_player(elapsed_time),
+                _ => {}
+            }
+            match self.key_flags & (KEY_MOVE_FWD | KEY_MOVE_BACK) {
+                KEY_MOVE_FWD => self.level.move_player(elapsed_time),
+                KEY_MOVE_BACK => self.level.move_player(-elapsed_time),
+                _ => {}
+            }
+        } else {
+            // in automap mode
+            match self.key_flags & (KEY_STRAFE_LEFT | KEY_STRAFE_RIGHT) {
+                KEY_STRAFE_LEFT => self.level.move_automap_x(-elapsed_time),
+                KEY_STRAFE_RIGHT => self.level.move_automap_x(elapsed_time),
+                _ => {}
+            }
+            match self.key_flags & (KEY_MOVE_FWD | KEY_MOVE_BACK) {
+                KEY_MOVE_FWD => self.level.move_automap_y(elapsed_time),
+                KEY_MOVE_BACK => self.level.move_automap_y(-elapsed_time),
+                _ => {}
+            }
+            match self.key_flags & (KEY_ZOOM_IN | KEY_ZOOM_OUT) {
+                KEY_ZOOM_IN => self.level.zoom_automap(elapsed_time),
+                KEY_ZOOM_OUT => self.level.zoom_automap(-elapsed_time),
+                _ => {}
+            }
+        }
 
         true
     }

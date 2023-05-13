@@ -26,8 +26,8 @@ pub enum ThingType {
 
 #[derive(Clone, Default)]
 pub struct Thing {
-    pos: Vertex,
-    angle: Angle,
+    pub pos: Vertex,
+    pub angle: Angle,
     type_code: u16,
     flags: u16,
     // TODO (later) fill in other values, based on type code
@@ -53,16 +53,6 @@ impl Thing {
             type_code,
             flags: buf_to_u16(&lump_data[8..10]),
         }
-    }
-
-    #[inline]
-    pub fn pos(&self) -> Vertex {
-        self.pos
-    }
-
-    #[inline]
-    pub fn angle(&self) -> Angle {
-        self.angle
     }
 
     #[inline]
