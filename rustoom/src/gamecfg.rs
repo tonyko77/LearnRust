@@ -16,11 +16,16 @@ impl GameConfig {
         assert!(scr_height > 0);
         assert!(wad_data.map_count() > 0);
 
+        let dist_from_screen = compute_dist_from_screen(scr_height);
+        let dx = (scr_width as f64) / 2.0;
+        let rad = dx.atan2(dist_from_screen);
+        let hfov = Angle::from_radians(rad);
         let igd = InternalGameData {
             wad_data,
             scr_width,
             scr_height,
-            dist_from_screen: compute_dist_from_screen(scr_height),
+            dist_from_screen,
+            hfov,
         };
         GameConfig(Rc::new(igd))
     }
@@ -57,7 +62,12 @@ impl GameConfig {
 
     #[inline]
     pub fn half_fov(&self) -> Angle {
-        self.screen_x_to_angle(0)
+        self.0.hfov
+    }
+
+    #[inline]
+    pub fn dist_from_screen(&self) -> f64 {
+        self.0.dist_from_screen
     }
 
     #[inline]
@@ -89,6 +99,7 @@ struct InternalGameData {
     scr_width: i32,
     scr_height: i32,
     dist_from_screen: f64,
+    hfov: Angle,
 }
 
 /// Compute distance from screen, assuming a 4/3 aspect ratio and a 90 degrees FOV,

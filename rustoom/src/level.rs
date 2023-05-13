@@ -1,8 +1,6 @@
 //! An "active" level map, where all the map data is expanded and "mutable".
 //! Built from an existing MapData.
 
-use std::cell::RefCell;
-
 use crate::angle::Angle;
 use crate::map::*;
 use crate::map_items::*;
@@ -10,6 +8,7 @@ use crate::pixmap::Texture;
 use crate::things::Thing;
 use crate::utils::*;
 use crate::*;
+use std::cell::RefCell;
 
 // LineDef flags
 const LINE_BLOCKS: u16 = 0x0001;
@@ -175,6 +174,62 @@ impl ActiveLevel {
         painter.fill_rect(0, 0, w, h, CYAN);
         // TODO properly align the sky with the player's rotation + fill the whole horizon width
         self.sky.paint(0, 0, painter, self.cfg.palette());
+
+        // collect segments, for painting
+        let segs = self.player_visible_segments(&self.player);
+        let ppos = self.player.pos;
+        let width = self.cfg.scr_width() as usize;
+        let mut painted = vec![0_u8; width];
+        let mut dbg_color = 240_u8;
+        for seg in segs.iter() {
+            // TODO render the seg CORRECTLY !
+            let a1 = Angle::from_vector(ppos, seg.start) - self.player.angle;
+            let a2 = Angle::from_vector(ppos, seg.end) - self.player.angle;
+            let (x1, _v1) = self.angle_to_x(a1, true);
+            let (x2, _v2) = self.angle_to_x(a2, false);
+            for x in x1..x2 {
+                if x < 0 || x >= (width as i32) {
+                    continue;
+                }
+                if painted[x as usize] != 0 {
+                    continue;
+                }
+                // ok to paint
+                let color = RGB::from(0, dbg_color, dbg_color);
+                painter.draw_line(x, 20, x, 50, color);
+                // also, mark seg as seen
+                painted[x as usize] = 1;
+                self.line_was_seen(seg.linedef_idx);
+            }
+            if dbg_color >= 10 {
+                dbg_color -= 10;
+            } else {
+                dbg_color = 0;
+            }
+        }
+
+        // TODO - TEMP message
+        let txt = format!("SEGs: {} / {}", segs.len(), self.map_data.seg_count());
+        self.cfg.font().draw_text(3, 15, &txt, WHITE, painter);
+    }
+
+    // TODO this is kinda hacky + not very efficient - but if it works, it's OK :))
+    fn angle_to_x(&self, angle: Angle, _is_start: bool) -> (i32, Angle) {
+        let w = self.cfg.scr_width();
+        let hfov = self.cfg.half_fov();
+        let minus_hfov = hfov * (-1.0);
+        if angle <= hfov || angle >= minus_hfov {
+            // in view
+            let dist = self.cfg.dist_from_screen();
+            let dx = (angle.rad().tan() * dist) as i32;
+            (w / 2 - dx, angle)
+        } else if angle < Angle::with_180_deg() {
+            // out of view, left edge
+            (0, hfov)
+        } else {
+            // out of view, right edge
+            (w - 1, minus_hfov)
+        }
     }
 
     fn paint_automap(&self, painter: &mut dyn Painter) {
