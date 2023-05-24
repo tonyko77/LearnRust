@@ -47,11 +47,10 @@ pub fn file_exist(filename: &str) -> bool {
 }
 
 /// Read an entire binary file into a vector of bytes.
-pub fn read_file_to_bytes(filename: &str) -> Result<Vec<u8>, String> {
+pub fn read_file_to_bytes(filename: &str, outbuf: &mut [u8]) -> Result<usize, String> {
     let mut f = File::open(&filename).map_err(|_| format!("File not found: {filename}"))?;
     let metadata = std::fs::metadata(&filename).map_err(|_| format!("Cannot read file metadata: {filename}"))?;
-    let mut buffer = vec![0; metadata.len() as usize];
-    f.read(&mut buffer)
-        .map_err(|_| format!("Cannot read file: {filename}"))?;
-    Ok(buffer)
+    let len = metadata.len() as usize;
+    f.read(outbuf).map_err(|_| format!("Cannot read file: {filename}"))?;
+    Ok(len)
 }

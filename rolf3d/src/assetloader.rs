@@ -32,6 +32,7 @@ VSWAP -> see https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_PM.C#L
 use crate::assets::*;
 use crate::utils::*;
 
+/// Holds all the assets loaded from the game files.
 pub struct GameAssets {
     pub game_type: &'static str,
     pub maps: Vec<MapData>,
@@ -42,10 +43,17 @@ pub struct GameAssets {
 
 impl GameAssets {
     pub fn load() -> Result<Self, String> {
+        // use a single, large buffer for all file loads
+        // (just me, complicating things ...)
+        let mut mutbuf = vec![0_u8; 2 * 1024 * 1024];
+
+        // load all asset files
         let game_type = detect_game_type()?;
-        let maps = load_maps(game_type)?;
-        let (walls, sprites) = load_vswap(game_type)?;
-        let pics = vec![]; // TODO load pics
+        let maps = load_maps(game_type, &mut mutbuf)?;
+        let (walls, sprites) = load_vswap(game_type, &mut mutbuf)?;
+        let pics = load_pics(game_type, &mut mutbuf)?;
+
+        // build the asset holder
         Ok(Self {
             game_type,
             maps,
@@ -58,6 +66,7 @@ impl GameAssets {
 
 //----------------------
 //  Internal stuff
+//----------------------
 
 /// All the supported asset file extensions.
 const EXTENSIONS: &[&'static str] = &["WL6", "SOD", "WL3", "WL1", "SDM"];
@@ -66,9 +75,9 @@ const EXTENSIONS: &[&'static str] = &["WL6", "SOD", "WL3", "WL1", "SDM"];
 const FILES: &[&'static str] = &["MAPHEAD", "GAMEMAPS", "VGADICT", "VGAHEAD", "VGAGRAPH", "VSWAP"];
 const MAPHEAD: usize = 0;
 const GAMEMAPS: usize = 1;
-// const VGADICT: usize = 2;
-// const VGAHEAD: usize = 3;
-// const VGAGRAPH: usize = 4;
+const VGADICT: usize = 2;
+const VGAHEAD: usize = 3;
+const VGAGRAPH: usize = 4;
 const VSWAP: usize = 5;
 
 /// Detect the game type, by checking if all asset files for each supported extension are found.
@@ -86,10 +95,12 @@ fn detect_game_type() -> Result<&'static str, String> {
 }
 
 //----------------------
-// Page (VSWAP) loader
+// Page loader (VSWAP)
+//----------------------
 
-fn load_vswap(ext: &str) -> Result<(Vec<GfxData>, Vec<GfxData>), String> {
-    let vswap = load_file(VSWAP, ext)?;
+fn load_vswap(ext: &str, mutbuf: &mut [u8]) -> Result<(Vec<GfxData>, Vec<GfxData>), String> {
+    let vs_len = load_file(VSWAP, ext, mutbuf)?;
+    let vswap = &mutbuf[0..vs_len];
     // read the 3 counters
     let cnt_chunks_in_file = buf_to_u16(&vswap[0..2]) as usize;
     let idx_sprite_start = buf_to_u16(&vswap[2..4]) as usize;
@@ -185,13 +196,16 @@ fn parse_sprite(compressed: &[u8]) -> Vec<u8> {
     pixels
 }
 
-//-------------
-// map loader
+//---------------------------------
+// Map loader - MAPHEAD, GAMEMAPS
+//---------------------------------
 
-fn load_maps(ext: &str) -> Result<Vec<MapData>, String> {
+fn load_maps(ext: &str, mutbuf: &mut [u8]) -> Result<Vec<MapData>, String> {
     // load files
-    let maphead = load_file(MAPHEAD, ext)?;
-    let gamemaps = load_file(GAMEMAPS, ext)?;
+    let mh_len = load_file(MAPHEAD, ext, mutbuf)?;
+    let gm_len = load_file(GAMEMAPS, ext, &mut mutbuf[mh_len..])?;
+    let maphead = &mutbuf[0..mh_len];
+    let gamemaps = &mutbuf[mh_len..mh_len + gm_len];
     let rlew_tag = buf_to_u16(&maphead[0..2]);
     // read each map
     let mut maps = vec![];
@@ -305,8 +319,36 @@ fn decompress_map_plane(chunk: &[u8], rlew_tag: u16) -> Vec<u16> {
     plane
 }
 
+//--------------------------------------------
+// Pic loader - VGADICT, VGAHEAD, VGAGRAPH
+//--------------------------------------------
+
+fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<Vec<GfxData>, String> {
+    // load the 3 files ...
+    let len1 = load_file(VGADICT, ext, mutbuf)?;
+    assert_eq!(1024, len1);
+    let len2 = load_file(VGAHEAD, ext, &mut mutbuf[len1..])?;
+    let len3 = load_file(VGAGRAPH, ext, &mut mutbuf[len1 + len2..])?;
+    // ... then split into buffers ...
+    let vgadict = &mutbuf[0..len1];
+    let vgahead = &mutbuf[len1..len1 + len2];
+    let vgagraph = &mutbuf[len1 + len2..len1 + len2 + len3];
+    // ... and prepare the results vector
+    let cnt_pics = len2 / 3;
+    assert_eq!(cnt_pics * 3, len2);
+    let pics = Vec::with_capacity(cnt_pics);
+
+    // TODO implement this ...
+
+    Ok(pics)
+}
+
+//--------------
+//  Misc ...
+//--------------
+
 #[inline]
-fn load_file(nameidx: usize, ext: &str) -> Result<Vec<u8>, String> {
+fn load_file(nameidx: usize, ext: &str, outbuf: &mut [u8]) -> Result<usize, String> {
     let fname = format!("{}.{}", FILES[nameidx], ext);
-    read_file_to_bytes(&fname)
+    read_file_to_bytes(&fname, outbuf)
 }

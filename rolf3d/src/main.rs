@@ -54,7 +54,7 @@ use rolf3d::*;
 const SCR_WIDTH: i32 = 480;
 const SCR_HEIGHT: i32 = 360;
 const PIXEL_SIZE: i32 = 2;
-const SLEEP_KIND: SleepKind = SleepKind::YIELD;
+const SLEEP_KIND: SleepKind = SleepKind::SLEEP(1);
 
 fn main() {
     // load and prepare game assets
