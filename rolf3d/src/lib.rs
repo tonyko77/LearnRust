@@ -5,6 +5,7 @@ mod assetloader;
 mod gameloop;
 mod scrbuf;
 mod sdl_wrapper;
+mod utils;
 
 // TODO remove "pub" from internal modules
 pub use assetloader::*;
