@@ -66,7 +66,10 @@ struct MapData {
     _name: String,
     _width: u16,
     _height: u16,
-    // TODO how to interpret the planes ???
+
+    // TODO how to interpret the map data?
+    //  -> looks like each map has 64*64 = 4096 words, between 0x00 and 0xFF
+    //  -> plane #2 seems to ALWAYS have 0-s => NOT USED ?!?, check SOD, WL6 etc
     _plane0: Vec<u16>,
     _plane1: Vec<u16>,
     _plane2: Vec<u16>,
@@ -135,23 +138,26 @@ fn load_one_map(hdridx: usize, gamemaps: &[u8], rlew_tag: u16) -> Result<MapData
         // decompress map plane
         planes[i] = decompress_map_plane(&gamemaps[ofs..], rlew_tag);
 
-        // TODO how to interpret the map data? each map has 64*64 = 4096 words ...
-        // also, plane #2 seems to ALWAYS have 0-s => NOT USED ?!?
-        println!(
-            "[MAP] {name} => plane {i} has {} words (compressed len = {})",
-            planes[i].len(),
-            len
-        );
-        // TEMP check for plane 2 with all zeros
-        if i == 2 {
-            let all_zero = planes[i].iter().all(|b| *b == 0);
-            if all_zero {
-                println!(" => {name} => plane 2 is all zeroes");
-            } else {
-                println!(" => {name} => !!! plane 2 is NOT ALL ZEROES !!!");
-            }
+        // TEMP check for plane with all zeros
+        println!("[MAP] {name} => plane {i} has {} words", planes[i].len());
+        let all_zero = planes[i].iter().all(|b| *b == 0);
+        if all_zero {
+            println!(" => {name} => plane {i} is all ZERO");
+        } else {
+            println!(" => {name} => plane {i} is HAS DATA");
+            // // print plane data
+            // let mut idx = 0;
+            // for _ in 0..64 {
+            //     for _ in 0..64 {
+            //         print!(" {:02X}", planes[i][idx]);
+            //         idx += 1;
+            //     }
+            //     println!("");
+            // }
+            // println!("");
         }
     }
+    println!(" - - - ");
 
     // return the map data
     let plane2 = planes.pop().unwrap();
