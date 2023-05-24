@@ -8,28 +8,13 @@
 //! * [id Software RLEW compression](https://moddingwiki.shikadi.net/wiki/Id_Software_RLEW_compression)
 //! * [WOLF3D orig sources - CAL_CarmackExpand](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_CA.C#L609)
 
+use crate::assets::*;
 use crate::utils::*;
-
-// TODO move this outside, to a different mod ?!
-// TODO remove pub from struct fields, where not needed !!!
-pub struct MapData {
-    pub name: String,
-    pub width: u16,
-    pub height: u16,
-
-    // TODO how to interpret the map data?
-    //  -> looks like each map has 64*64 = 4096 words, between 0x00 and 0xFF
-    //      => it's JUST a 2D array :))
-    //  -> plane #1 seems to contain WALLS, plane #2 seems to contain THINGS
-    //  -> plane #3 seems to ALWAYS have 0-s => NOT USED ?!?, check SOD, WL6 etc
-    pub walls: Vec<u16>,
-    pub things: Vec<u16>,
-}
 
 pub struct GameAssets {
     pub game_type: &'static str,
-    pub maps: Vec<MapData>,
-    // TODO - maps, textures, sprites, graphics ...
+    maps: Vec<MapData>,
+    // TODO - textures, sprites, graphics ...
 }
 
 impl GameAssets {
@@ -38,10 +23,23 @@ impl GameAssets {
         let maps = load_maps(game_type)?;
         Ok(Self { game_type, maps })
     }
+
+    #[inline]
+    pub fn map_count(&self) -> usize {
+        self.maps.len()
+    }
+
+    #[inline]
+    pub fn map(&self, idx: usize) -> &MapData {
+        &self.maps[idx]
+    }
 }
 
 //----------------------
 //  Internal stuff
+
+/// All the supported asset file extensions.
+const EXTENSIONS: &[&'static str] = &["WL6", "SOD", "WL3", "WL1", "SDM"];
 
 /// All the supported asset file names.
 const FILES: &[&'static str] = &["MAPHEAD", "GAMEMAPS", "VGADICT", "VGAHEAD", "VGAGRAPH", "VSWAP"];
@@ -51,9 +49,6 @@ const GAMEMAPS: usize = 1;
 // const VGAHEAD: usize = 3;
 // const VGAGRAPH: usize = 4;
 // const VSWAP: usize = 5;
-
-/// All the supported asset file extensions.
-const EXTENSIONS: &[&'static str] = &["WL1", "WL3", "WL6", "SDM", "SOD"];
 
 /// Detect the game type, by checking if all asset files for each supported extension are found.
 fn detect_game_type() -> Result<&'static str, String> {
@@ -69,8 +64,8 @@ fn detect_game_type() -> Result<&'static str, String> {
     Err(String::from("Game asset files not found"))
 }
 
-//---------------------
-// TODO map loader
+//-------------
+// map loader
 
 fn load_maps(ext: &str) -> Result<Vec<MapData>, String> {
     // load files
@@ -80,7 +75,7 @@ fn load_maps(ext: &str) -> Result<Vec<MapData>, String> {
     // read each map
     let mut maps = vec![];
     let mut idx = 2;
-    loop {
+    while (idx + 3) < maphead.len() {
         let mapidx = buf_to_i32(&maphead[idx..]);
         if mapidx <= 0 {
             break;
@@ -92,6 +87,7 @@ fn load_maps(ext: &str) -> Result<Vec<MapData>, String> {
         idx += 4;
     }
 
+    println!("[ROLF3D] Loaded {} maps of type {}", maps.len(), ext);
     Ok(maps)
 }
 
@@ -100,12 +96,12 @@ fn load_one_map(hdridx: usize, gamemaps: &[u8], rlew_tag: u16) -> Result<MapData
     if gamemaps.len() <= (hdridx + 26) {
         return Err(format!("Invalid map header index: {hdridx}"));
     }
-    // offsets and compressed lengths for each plane
+
+    // offsets and compressed lengths for each of the 3 planes
+    // * ignore plane 3, it is always ZERO
+    // * also ignore compressed lengths (encoded data also contains len of decoded data)
     let ofs_plane_1 = buf_to_i32(&gamemaps[hdridx..]);
     let ofs_plane_2 = buf_to_i32(&gamemaps[hdridx + 4..]);
-    // ignore plane 3, it is always ZERO
-    let len_plane_1 = buf_to_u16(&gamemaps[hdridx + 12..]) as usize;
-    let len_plane_2 = buf_to_u16(&gamemaps[hdridx + 14..]) as usize;
 
     // map size and name
     let width = buf_to_u16(&gamemaps[hdridx + 18..]);
@@ -113,30 +109,20 @@ fn load_one_map(hdridx: usize, gamemaps: &[u8], rlew_tag: u16) -> Result<MapData
     let name = buf_to_ascii(&gamemaps[hdridx + 22..], 16);
 
     // parse each plane
-    let walls = decompress_map_plane(ofs_plane_1, len_plane_1, gamemaps, rlew_tag);
-    let things = decompress_map_plane(ofs_plane_2, len_plane_2, gamemaps, rlew_tag);
+    if ofs_plane_1 <= 0 || ofs_plane_2 <= 0 {
+        return Err(format!("Missing plane in GAMEMAPS for {name} @ 0x{hdridx:04X}"));
+    }
+    let ofs1 = ofs_plane_1 as usize;
+    let ofs2 = ofs_plane_2 as usize;
+    let walls = decompress_map_plane(&gamemaps[ofs1..], rlew_tag);
+    let things = decompress_map_plane(&gamemaps[ofs2..], rlew_tag);
 
     // return the map data
-    Ok(MapData {
-        name,
-        width,
-        height,
-        walls,
-        things,
-    })
+    Ok(MapData::new(name, width, height, walls, things))
 }
 
 /// Use Carmack and RLEW decompression, to extract the map plane
-fn decompress_map_plane(ofs: i32, len: usize, gamemaps: &[u8], rlew_tag: u16) -> Vec<u16> {
-    if ofs <= 0 {
-        // TODO what if a plane is missing ??
-        panic!("Missing plane");
-    }
-
-    // decompress map plane
-    let ofs = ofs as usize;
-    let chunk = &gamemaps[ofs..ofs + len];
-
+fn decompress_map_plane(chunk: &[u8], rlew_tag: u16) -> Vec<u16> {
     // first de-Carmack ...
     // first word of the Carmack-ed chunk is the decompressed length, in bytes
     let intermed_word_cnt = (buf_to_u16(chunk) / 2) as usize;

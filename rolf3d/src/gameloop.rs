@@ -17,8 +17,8 @@ impl GameLoop {
             scrbuf: ScreenBuffer::new(width, height),
             assets,
             tmp_idx: 0,
-            tmp_x: 0,
-            tmp_y: 0,
+            tmp_x: -5,
+            tmp_y: -5,
         }
     }
 }
@@ -30,20 +30,20 @@ impl GraphicsLoop for GameLoop {
             Event::KeyDown { keycode: Some(key), .. } => {
                 match key {
                     //Keycode::Tab => self.level.toggle_automap(),
-                    Keycode::Up => self.tmp_y = Ord::max(self.tmp_y - 1, 0),
+                    Keycode::Up => self.tmp_y = Ord::max(self.tmp_y - 1, -10),
                     Keycode::Down => self.tmp_y = Ord::min(self.tmp_y + 1, 53),
-                    Keycode::Left => self.tmp_x = Ord::max(self.tmp_x - 1, 0),
+                    Keycode::Left => self.tmp_x = Ord::max(self.tmp_x - 1, -10),
                     Keycode::Right => self.tmp_x = Ord::min(self.tmp_x + 1, 53),
                     Keycode::PageUp => self.tmp_idx = (self.tmp_idx + 999) % 1000,
                     Keycode::PageDown => self.tmp_idx = (self.tmp_idx + 1) % 1000,
                     Keycode::Home => {
                         self.tmp_idx = 0;
-                        self.tmp_x = 0;
-                        self.tmp_y = 0;
+                        self.tmp_x = -5;
+                        self.tmp_y = -5;
                     }
                     Keycode::End => {
-                        self.tmp_x = 0;
-                        self.tmp_y = 0;
+                        self.tmp_x = -5;
+                        self.tmp_y = -5;
                     }
                     _ => {}
                 }
@@ -74,26 +74,24 @@ fn _temp_paint_map(zelf: &mut GameLoop) {
     let sh = zelf.scrbuf.height() as i32;
     zelf.scrbuf.fill_rect(0, 0, sw, sh, 0);
 
-    let mapidx = zelf.tmp_idx % zelf.assets.maps.len();
-    let map = &zelf.assets.maps[mapidx];
-    for y in 0..map.height {
-        for x in 0..map.width {
+    let mapidx = zelf.tmp_idx % zelf.assets.map_count();
+    let map = zelf.assets.map(mapidx);
+    let mw = map.width();
+    let mh = map.height();
+
+    for y in 0..mh {
+        for x in 0..mw {
             let xx = (x as i32) + zelf.tmp_x;
             let yy = (y as i32) + zelf.tmp_y;
-            if xx >= 0 && yy >= 0 && xx < (map.width as i32) && yy < (map.height as i32) {
-                let idx = (yy * (map.width as i32) + xx) as usize;
-                let wall = if idx < map.walls.len() { map.walls[idx] } else { 0 };
-                let thng = if idx < map.things.len() { map.things[idx] } else { 0 };
-                assert!(wall <= 0xFF);
-                assert!(thng <= 0xFF);
+            let wall = map.wall(xx, yy);
+            let thng = map.thing(xx, yy);
 
+            if wall > 0 {
+                // draw wall rect
                 let ix = (x * 9) as i32;
                 let iy = (y * 9) as i32;
-
-                // draw wall rect
                 let wcol = (wall & 0xFF) as u8;
                 zelf.scrbuf.fill_rect(ix, iy, 8, 8, wcol);
-
                 // draw thing
                 if thng > 0 {
                     zelf.scrbuf.fill_rect(ix + 2, iy + 2, 4, 4, 0);
