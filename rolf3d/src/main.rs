@@ -8,8 +8,8 @@
   TODO - implementation steps for ROLF3D:
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    * (NEXT) load graphics assets and paint them
-        - INVESTIGATE: formats/encoding for VGAGRAPH and VSWAP ?!?
+    * (IN PROGRESS) load graphics assets
+    * test-paint gfx assets - use <Tab> to switch between automap and Gfx
 
     * add display text (of any color)
 

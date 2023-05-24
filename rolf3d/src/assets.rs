@@ -6,6 +6,49 @@
 //  -> plane #1 seems to contain WALLS, plane #2 seems to contain THINGS
 //  -> plane #3 seems to ALWAYS have 0-s => NOT USED ?!?, check SOD, WL6 etc
 
+/// Graphics types
+pub enum GfxType {
+    WALL,
+    SPRITE,
+    PIC,
+}
+
+/// Graphics - contains walls, sprites and miscellaneous (fonts, PICs etc)
+/// Each pic is stored as columns, then rows (flipped)
+pub struct GfxData {
+    pub gtype: GfxType,
+    pub width: u16,
+    pub height: u16,
+    pub pixels: Vec<u8>,
+}
+// TODO temporary pub-s !!!
+
+impl GfxData {
+    pub fn new_wall(pixels: Vec<u8>) -> Self {
+        let wh = if pixels.is_empty() { 0 } else { 64 };
+        Self::new(GfxType::WALL, wh, wh, pixels)
+    }
+
+    pub fn new_sprite(pixels: Vec<u8>) -> Self {
+        let wh = if pixels.is_empty() { 0 } else { 64 };
+        Self::new(GfxType::SPRITE, wh, wh, pixels)
+    }
+
+    pub fn new_pic(width: u16, height: u16, pixels: Vec<u8>) -> Self {
+        Self::new(GfxType::PIC, width, height, pixels)
+    }
+
+    fn new(gtype: GfxType, width: u16, height: u16, pixels: Vec<u8>) -> Self {
+        assert_eq!((width * height) as usize, pixels.len());
+        Self {
+            gtype,
+            width,
+            height,
+            pixels,
+        }
+    }
+}
+
 /// Map data - contains walls/doors and things.
 pub struct MapData {
     name: String,
