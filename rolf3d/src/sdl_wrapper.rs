@@ -38,6 +38,16 @@ impl SdlConfiguration {
             sleep_kind,
         }
     }
+
+    #[inline]
+    pub fn scr_width(&self) -> i32 {
+        self.scr_width
+    }
+
+    #[inline]
+    pub fn scr_height(&self) -> i32 {
+        self.scr_height
+    }
 }
 
 /// Trait to be implemented by clients of `run_sdl_loop`.
