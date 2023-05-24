@@ -61,7 +61,18 @@ fn detect_game_type() -> Result<&'static str, String> {
 //---------------------
 // TODO map loader
 
-fn load_maps(ext: &str) -> Result<(), String> {
+// TODO move this outside, to a different mod
+struct MapData {
+    _name: String,
+    _width: u16,
+    _height: u16,
+    // TODO how to interpret the planes ???
+    _plane0: Vec<u16>,
+    _plane1: Vec<u16>,
+    _plane2: Vec<u16>,
+}
+
+fn load_maps(ext: &str) -> Result<Vec<MapData>, String> {
     // load files
     let maphead = load_file(MAPHEAD, ext)?;
     let gamemaps = load_file(GAMEMAPS, ext)?;
@@ -69,6 +80,7 @@ fn load_maps(ext: &str) -> Result<(), String> {
         return Err(format!("Unexpected magic number in "));
     }
     // read each map
+    let mut maps = vec![];
     let mut idx = 2;
     loop {
         let mapidx = buf_to_i32(&maphead[idx..]);
@@ -77,37 +89,124 @@ fn load_maps(ext: &str) -> Result<(), String> {
         }
 
         // ok to read map
-        load_one_map(mapidx as usize, &gamemaps)?;
+        let map = load_one_map(mapidx as usize, &gamemaps)?;
+        maps.push(map);
         idx += 4;
     }
 
-    Ok(())
+    Ok(maps)
 }
 
-fn load_one_map(hdridx: usize, gamemaps: &[u8]) -> Result<(), String> {
+fn load_one_map(hdridx: usize, gamemaps: &[u8]) -> Result<MapData, String> {
     // parse map header
     if gamemaps.len() <= (hdridx + 26) {
         return Err(format!("Invalid map header index: {hdridx}"));
     }
-    // offset for each plane
-    let off_plane_0 = buf_to_i32(&gamemaps[hdridx..]);
-    let off_plane_1 = buf_to_i32(&gamemaps[hdridx + 4..]);
-    let off_plane_2 = buf_to_i32(&gamemaps[hdridx + 8..]);
+    // offsets for each plane
+    let off_planes = [
+        buf_to_i32(&gamemaps[hdridx..]),
+        buf_to_i32(&gamemaps[hdridx + 4..]),
+        buf_to_i32(&gamemaps[hdridx + 8..]),
+    ];
     // lengths of (compressed) plane chunks
-    let len_plane_0 = buf_to_u16(&gamemaps[hdridx + 12..]);
-    let len_plane_1 = buf_to_u16(&gamemaps[hdridx + 14..]);
-    let len_plane_2 = buf_to_u16(&gamemaps[hdridx + 16..]);
+    let len_planes = [
+        buf_to_u16(&gamemaps[hdridx + 12..]),
+        buf_to_u16(&gamemaps[hdridx + 14..]),
+        buf_to_u16(&gamemaps[hdridx + 16..]),
+    ];
     // map size
-    let map_width = buf_to_u16(&gamemaps[hdridx + 18..]);
-    let map_height = buf_to_u16(&gamemaps[hdridx + 20..]);
+    let width = buf_to_u16(&gamemaps[hdridx + 18..]);
+    let height = buf_to_u16(&gamemaps[hdridx + 20..]);
     // internal map name
-    let internal_name = buf_to_ascii(&gamemaps[hdridx + 22..], 16);
+    let name = buf_to_ascii(&gamemaps[hdridx + 22..], 16);
 
     // TODO implement this - use a map structure !!!
     // e.g. pub struct GameLevel { width, height, planes }
-    println!("[MAP] TODO load map: {internal_name} {map_width}x{map_height}");
-    println!(" -> @ ({off_plane_0}, {len_plane_0}), ({off_plane_1}, {len_plane_1}), ({off_plane_2}, {len_plane_2})");
-    Ok(())
+    println!("[MAP] TODO load map: {name} -> {width}x{height}");
+
+    // parse each plane
+    let mut planes = vec![vec![], vec![], vec![]];
+    for i in 0..=2 {
+        let ofs = off_planes[i];
+        if ofs <= 0 {
+            // TODO what if a plane is missing ??
+            println!("[MAP] Missing plane {i} for {name}");
+            continue;
+        }
+        let ofs = ofs as usize;
+        let len = len_planes[i] as usize;
+        if gamemaps.len() < (ofs + len) {
+            return Err(format!("Invalid map plane {i} for {name}"));
+        }
+        // decompress map plane
+        planes[i] = decompress_map_plane(&gamemaps[ofs..ofs + len]);
+        // TODO how to interpret the map data ??
+        println!(
+            "[MAP] {name} => plane {i} has {} words (compressed len = {})",
+            planes[i].len(),
+            len
+        );
+    }
+
+    // return the map data
+    let plane2 = planes.pop().unwrap();
+    let plane1 = planes.pop().unwrap();
+    let plane0 = planes.pop().unwrap();
+    Ok(MapData {
+        _name: name,
+        _width: width,
+        _height: height,
+        _plane0: plane0,
+        _plane1: plane1,
+        _plane2: plane2,
+    })
+}
+
+/// Use RLE + Carmack decompression, to extract the map plane
+fn decompress_map_plane(chunk: &[u8]) -> Vec<u16> {
+    let len = chunk.len();
+    let mut plane = Vec::with_capacity(1024);
+    let mut idx = 0;
+    // decode the words
+    while (idx + 1) < len {
+        let b1 = chunk[idx];
+        let b2 = chunk[idx + 1];
+        if (b2 == 0xA7 || b2 == 0xA8) && b1 == 0 {
+            // Carmack-style escape sequence
+            let b1 = chunk[idx + 2];
+            let w = (b1 as u16) | ((b2 as u16) << 8);
+            plane.push(w);
+            idx += 3;
+        } else if b2 == 0xA7 {
+            // Carmack-style near pointer
+            let offs = plane.len() - (chunk[idx + 2] as usize);
+            idx += 3;
+            for i in 0..b1 as usize {
+                plane.push(plane[offs + i]);
+            }
+        } else if b2 == 0xA8 {
+            // Carmack-style far pointer
+            let offs = buf_to_u16(&chunk[idx + 2..]) as usize;
+            idx += 4;
+            for i in 0..b1 as usize {
+                plane.push(plane[offs + i]);
+            }
+        } else if b1 == 0xCD && b2 == 0xAB {
+            // RLE encoding
+            let cnt = buf_to_u16(&chunk[idx + 2..]);
+            let val = buf_to_u16(&chunk[idx + 4..]);
+            idx += 6;
+            for _ in 0..cnt {
+                plane.push(val);
+            }
+        } else {
+            // normal word
+            let val = (b1 as u16) | ((b2 as u16) << 8);
+            plane.push(val);
+            idx += 2;
+        }
+    }
+    plane
 }
 
 #[inline]
