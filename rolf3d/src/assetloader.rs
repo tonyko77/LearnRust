@@ -76,9 +76,7 @@ fn load_maps(ext: &str) -> Result<Vec<MapData>, String> {
     // load files
     let maphead = load_file(MAPHEAD, ext)?;
     let gamemaps = load_file(GAMEMAPS, ext)?;
-    if buf_to_u16(&maphead[0..2]) != 0xABCD {
-        return Err(format!("Unexpected magic number in "));
-    }
+    let rlew_tag = buf_to_u16(&maphead[0..2]);
     // read each map
     let mut maps = vec![];
     let mut idx = 2;
@@ -89,7 +87,7 @@ fn load_maps(ext: &str) -> Result<Vec<MapData>, String> {
         }
 
         // ok to read map
-        let map = load_one_map(mapidx as usize, &gamemaps)?;
+        let map = load_one_map(mapidx as usize, &gamemaps, rlew_tag)?;
         maps.push(map);
         idx += 4;
     }
@@ -97,7 +95,7 @@ fn load_maps(ext: &str) -> Result<Vec<MapData>, String> {
     Ok(maps)
 }
 
-fn load_one_map(hdridx: usize, gamemaps: &[u8]) -> Result<MapData, String> {
+fn load_one_map(hdridx: usize, gamemaps: &[u8], rlew_tag: u16) -> Result<MapData, String> {
     // parse map header
     if gamemaps.len() <= (hdridx + 26) {
         return Err(format!("Invalid map header index: {hdridx}"));
@@ -120,10 +118,6 @@ fn load_one_map(hdridx: usize, gamemaps: &[u8]) -> Result<MapData, String> {
     // internal map name
     let name = buf_to_ascii(&gamemaps[hdridx + 22..], 16);
 
-    // TODO implement this - use a map structure !!!
-    // e.g. pub struct GameLevel { width, height, planes }
-    println!("[MAP] TODO load map: {name} -> {width}x{height}");
-
     // parse each plane
     let mut planes = vec![vec![], vec![], vec![]];
     for i in 0..=2 {
@@ -139,13 +133,24 @@ fn load_one_map(hdridx: usize, gamemaps: &[u8]) -> Result<MapData, String> {
             return Err(format!("Invalid map plane {i} for {name}"));
         }
         // decompress map plane
-        planes[i] = decompress_map_plane(&gamemaps[ofs..ofs + len]);
-        // TODO how to interpret the map data ??
+        planes[i] = decompress_map_plane(&gamemaps[ofs..], rlew_tag);
+
+        // TODO how to interpret the map data? each map has 64*64 = 4096 words ...
+        // also, plane #2 seems to ALWAYS have 0-s => NOT USED ?!?
         println!(
             "[MAP] {name} => plane {i} has {} words (compressed len = {})",
             planes[i].len(),
             len
         );
+        // TEMP check for plane 2 with all zeros
+        if i == 2 {
+            let all_zero = planes[i].iter().all(|b| *b == 0);
+            if all_zero {
+                println!(" => {name} => plane 2 is all zeroes");
+            } else {
+                println!(" => {name} => !!! plane 2 is NOT ALL ZEROES !!!");
+            }
+        }
     }
 
     // return the map data
@@ -162,50 +167,66 @@ fn load_one_map(hdridx: usize, gamemaps: &[u8]) -> Result<MapData, String> {
     })
 }
 
-/// Use RLE + Carmack decompression, to extract the map plane
-fn decompress_map_plane(chunk: &[u8]) -> Vec<u16> {
-    let len = chunk.len();
-    let mut plane = Vec::with_capacity(1024);
-    let mut idx = 0;
-    // decode the words
-    while (idx + 1) < len {
+/// Use Carmack and RLEW decompression, to extract the map plane
+fn decompress_map_plane(chunk: &[u8], rlew_tag: u16) -> Vec<u16> {
+    // first de-Carmack ...
+    // first word of the Carmack-ed chunk is the decompressed length, in bytes
+    let intermed_word_cnt = (buf_to_u16(chunk) / 2) as usize;
+    let mut intermediate = Vec::with_capacity(intermed_word_cnt);
+    let mut idx = 2;
+    while intermediate.len() < intermed_word_cnt {
         let b1 = chunk[idx];
         let b2 = chunk[idx + 1];
         if (b2 == 0xA7 || b2 == 0xA8) && b1 == 0 {
             // Carmack-style escape sequence
             let b1 = chunk[idx + 2];
             let w = (b1 as u16) | ((b2 as u16) << 8);
-            plane.push(w);
+            intermediate.push(w);
             idx += 3;
         } else if b2 == 0xA7 {
             // Carmack-style near pointer
-            let offs = plane.len() - (chunk[idx + 2] as usize);
+            let offs = intermediate.len() - (chunk[idx + 2] as usize);
             idx += 3;
             for i in 0..b1 as usize {
-                plane.push(plane[offs + i]);
+                intermediate.push(intermediate[offs + i]);
             }
         } else if b2 == 0xA8 {
             // Carmack-style far pointer
             let offs = buf_to_u16(&chunk[idx + 2..]) as usize;
             idx += 4;
             for i in 0..b1 as usize {
-                plane.push(plane[offs + i]);
+                intermediate.push(intermediate[offs + i]);
             }
-        } else if b1 == 0xCD && b2 == 0xAB {
-            // RLE encoding
-            let cnt = buf_to_u16(&chunk[idx + 2..]);
-            let val = buf_to_u16(&chunk[idx + 4..]);
-            idx += 6;
+        } else {
+            // normal word
+            let val = (b1 as u16) | ((b2 as u16) << 8);
+            intermediate.push(val);
+            idx += 2;
+        }
+    }
+
+    // ... and then decompress RLEW
+    // first word of the RLEW-ed data is the decompressed length, in bytes
+    let decoded_word_cnt = (intermediate[0] / 2) as usize;
+    let mut plane = Vec::with_capacity(decoded_word_cnt);
+    let mut idx = 1;
+    while plane.len() < decoded_word_cnt {
+        let next = intermediate[idx];
+        if next == rlew_tag {
+            // RLEW sequence
+            let cnt = intermediate[idx + 1];
+            let val = intermediate[idx + 2];
+            idx += 3;
             for _ in 0..cnt {
                 plane.push(val);
             }
         } else {
             // normal word
-            let val = (b1 as u16) | ((b2 as u16) << 8);
-            plane.push(val);
-            idx += 2;
+            idx += 1;
+            plane.push(next);
         }
     }
+
     plane
 }
 
