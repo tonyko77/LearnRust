@@ -34,10 +34,10 @@ use crate::utils::*;
 
 pub struct GameAssets {
     pub game_type: &'static str,
-    maps: Vec<MapData>,
-    walls: Vec<GfxData>,
-    sprites: Vec<GfxData>,
-    pics: Vec<GfxData>,
+    pub maps: Vec<MapData>,
+    pub walls: Vec<GfxData>,
+    pub sprites: Vec<GfxData>,
+    pub pics: Vec<GfxData>,
 }
 
 impl GameAssets {
@@ -53,16 +53,6 @@ impl GameAssets {
             sprites,
             pics,
         })
-    }
-
-    #[inline]
-    pub fn map_count(&self) -> usize {
-        self.maps.len()
-    }
-
-    #[inline]
-    pub fn map(&self, idx: usize) -> &MapData {
-        &self.maps[idx]
     }
 }
 
@@ -131,7 +121,6 @@ fn load_vswap(ext: &str) -> Result<(Vec<GfxData>, Vec<GfxData>), String> {
             let pixels = vswap[ofs..ofs + len].iter().cloned().collect();
             vec_walls.push(GfxData::new_wall(pixels));
         } else {
-            println!("[DBG] empty WALL at idx {i}");
             vec_walls.push(GfxData::new_wall(vec![]));
         }
     }
@@ -144,7 +133,6 @@ fn load_vswap(ext: &str) -> Result<(Vec<GfxData>, Vec<GfxData>), String> {
             let pixels = parse_sprite(&vswap[ofs..ofs + len]);
             vec_sprites.push(GfxData::new_sprite(pixels));
         } else {
-            println!("[DBG] empty SPRITE at idx {i}");
             vec_sprites.push(GfxData::new_sprite(vec![]));
         }
     }
@@ -152,19 +140,46 @@ fn load_vswap(ext: &str) -> Result<(Vec<GfxData>, Vec<GfxData>), String> {
     Ok((vec_walls, vec_sprites))
 }
 
-// TODO represent sprites more sparsely (do NOT fill with 0xFF pixels, up to 64x64)
 fn parse_sprite(compressed: &[u8]) -> Vec<u8> {
     let mut pixels = vec![0xFF; 64 * 64];
     // the first 2 words = the left and right extents of the sprite
     let left_extent = buf_to_u16(&compressed[0..2]) as usize;
     let right_extent = buf_to_u16(&compressed[2..4]) as usize;
-    // the next N words are the offsets for each column
+
+    // the next N words are the offsets for each column,
+    // then come the textels packed together (one byte each),
+    // and then come the "commands" for each column
+    // (one word each, zero-terminated for each sub-column)
+
+    // moving index into the offsets to the command area for each column
+    let mut ofsidx = 4;
+    // moving index into the texel area
+    let mut texidx = 4 + 2 * (right_extent - left_extent + 1);
+
+    // compute texels for each column
+    // -> see https://devinsmith.net/backups/bruce/wolf3d.html
     for x in left_extent..=right_extent {
-        let ofsidx = 4 + 2 * (x - left_extent);
-        let column_ofs = buf_to_u16(&compressed[ofsidx..]) as usize;
+        // offset to the column start, into the destination vector
         let destidx = x * 64;
-        // TODO - complicated layout of sprite columns !!!
-        // -> see https://devinsmith.net/backups/bruce/wolf3d.html
+        // read the offset into the command area for this column
+        let mut column_ofs = buf_to_u16(&compressed[ofsidx..]) as usize;
+        ofsidx += 2;
+        // keep reading commands for the column
+        // each command is 3 words: end_y * 2, ignored, start_y * 2
+        loop {
+            let end_y = (buf_to_u16(&compressed[column_ofs..]) / 2) as usize;
+            if end_y == 0 {
+                break;
+            }
+            let start_y = (buf_to_u16(&compressed[column_ofs + 4..]) / 2) as usize;
+            column_ofs += 6;
+            for y in start_y..end_y {
+                let tex = compressed[texidx];
+                assert_ne!(0xFF, tex);
+                pixels[destidx + y] = tex;
+                texidx += 1;
+            }
+        }
     }
 
     pixels

@@ -21,7 +21,6 @@ pub struct GfxData {
     pub height: u16,
     pub pixels: Vec<u8>,
 }
-// TODO temporary pub-s !!!
 
 impl GfxData {
     pub fn new_wall(pixels: Vec<u8>) -> Self {

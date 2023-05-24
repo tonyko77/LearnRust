@@ -9,7 +9,8 @@
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     * (IN PROGRESS) load graphics assets
-    * test-paint gfx assets - use <Tab> to switch between automap and Gfx
+    + test-paint gfx assets - use <Tab> to switch between automap and Gfx
+        -> STILL TO DO: vgadict/vgahead/vgagraph
 
     * add display text (of any color)
 

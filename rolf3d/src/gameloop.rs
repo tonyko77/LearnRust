@@ -1,6 +1,6 @@
 //! Main game loop
 
-use crate::{GameAssets, GraphicsLoop, Painter, ScreenBuffer};
+use crate::{GameAssets, GfxData, GraphicsLoop, Painter, ScreenBuffer};
 use sdl2::{event::Event, keyboard::Keycode};
 
 pub struct GameLoop {
@@ -9,6 +9,7 @@ pub struct GameLoop {
     tmp_idx: usize,
     tmp_x: i32,
     tmp_y: i32,
+    tmp_automap: bool,
 }
 
 impl GameLoop {
@@ -19,6 +20,7 @@ impl GameLoop {
             tmp_idx: 0,
             tmp_x: -5,
             tmp_y: -5,
+            tmp_automap: false,
         }
     }
 }
@@ -27,27 +29,25 @@ impl GraphicsLoop for GameLoop {
     fn handle_event(&mut self, event: &Event) -> bool {
         // check keys
         match event {
-            Event::KeyDown { keycode: Some(key), .. } => {
-                match key {
-                    //Keycode::Tab => self.level.toggle_automap(),
-                    Keycode::Up => self.tmp_y = Ord::max(self.tmp_y - 1, -10),
-                    Keycode::Down => self.tmp_y = Ord::min(self.tmp_y + 1, 53),
-                    Keycode::Left => self.tmp_x = Ord::max(self.tmp_x - 1, -10),
-                    Keycode::Right => self.tmp_x = Ord::min(self.tmp_x + 1, 53),
-                    Keycode::PageUp => self.tmp_idx = (self.tmp_idx + 999) % 1000,
-                    Keycode::PageDown => self.tmp_idx = (self.tmp_idx + 1) % 1000,
-                    Keycode::Home => {
-                        self.tmp_idx = 0;
-                        self.tmp_x = -5;
-                        self.tmp_y = -5;
-                    }
-                    Keycode::End => {
-                        self.tmp_x = -5;
-                        self.tmp_y = -5;
-                    }
-                    _ => {}
+            Event::KeyDown { keycode: Some(key), .. } => match key {
+                Keycode::Tab => self.tmp_automap = !self.tmp_automap,
+                Keycode::Up => self.tmp_y = Ord::max(self.tmp_y - 1, -10),
+                Keycode::Down => self.tmp_y = Ord::min(self.tmp_y + 1, 53),
+                Keycode::Left => self.tmp_x = Ord::max(self.tmp_x - 1, -10),
+                Keycode::Right => self.tmp_x = Ord::min(self.tmp_x + 1, 53),
+                Keycode::PageUp => self.tmp_idx = (self.tmp_idx + 999) % 1000,
+                Keycode::PageDown => self.tmp_idx = (self.tmp_idx + 1) % 1000,
+                Keycode::Home => {
+                    self.tmp_idx = 0;
+                    self.tmp_x = -5;
+                    self.tmp_y = -5;
                 }
-            }
+                Keycode::End => {
+                    self.tmp_x = -5;
+                    self.tmp_y = -5;
+                }
+                _ => {}
+            },
             _ => {}
         }
         true
@@ -55,7 +55,11 @@ impl GraphicsLoop for GameLoop {
 
     fn update_state(&mut self, _elapsed_time: f64) -> bool {
         // TODO update game state
-        _temp_paint_map(self);
+        if self.tmp_automap {
+            _temp_paint_map(self);
+        } else {
+            _temp_paint_gfx(self);
+        }
 
         true
     }
@@ -74,8 +78,8 @@ fn _temp_paint_map(zelf: &mut GameLoop) {
     let sh = zelf.scrbuf.height() as i32;
     zelf.scrbuf.fill_rect(0, 0, sw, sh, 0);
 
-    let mapidx = zelf.tmp_idx % zelf.assets.map_count();
-    let map = zelf.assets.map(mapidx);
+    let mapidx = zelf.tmp_idx % zelf.assets.maps.len();
+    let map = &zelf.assets.maps[mapidx];
     let mw = map.width();
     let mh = map.height();
 
@@ -102,8 +106,51 @@ fn _temp_paint_map(zelf: &mut GameLoop) {
     }
 }
 
+// TODO temporary paint gfx
+fn _temp_paint_gfx(zelf: &mut GameLoop) {
+    _temp_paint_palette(&mut zelf.scrbuf);
+
+    let x0 = (zelf.scrbuf.width() - 72) as i32;
+    let y0 = (zelf.scrbuf.height() - 80) as i32;
+
+    // paint wall
+    let wallidx = zelf.tmp_idx % zelf.assets.walls.len();
+    let wall = &zelf.assets.walls[wallidx];
+    _temp_paint_pic(wall, x0, 10, &mut zelf.scrbuf);
+
+    // paint sprite
+    let sprtidx = zelf.tmp_idx % zelf.assets.sprites.len();
+    let sprite = &zelf.assets.sprites[sprtidx];
+    _temp_paint_pic(sprite, x0, y0, &mut zelf.scrbuf);
+
+    // TODO paint pics !!
+}
+
+// TODO temporary paint a graphic
+fn _temp_paint_pic(gfx: &GfxData, x0: i32, y0: i32, scrbuf: &mut ScreenBuffer) {
+    let pw = gfx.width as i32;
+    let ph = gfx.height as i32;
+
+    if pw == 0 || ph == 0 {
+        // empty pic !!
+        scrbuf.fill_rect(x0, y0, 8, 8, 0xFE);
+    } else {
+        scrbuf.fill_rect(x0, y0, pw, ph, 0xFF);
+        let mut idx = 0;
+        for x in 0..pw {
+            for y in 0..ph {
+                let c = gfx.pixels[idx];
+                idx += 1;
+                scrbuf.put_pixel(x + x0, y + y0, c);
+            }
+        }
+    }
+}
+
 // TODO temporary paint palette
 fn _temp_paint_palette(scrbuf: &mut ScreenBuffer) {
+    const SQSIZE: i32 = 8;
+
     let sw = scrbuf.width() as i32;
     let sh = scrbuf.height() as i32;
     scrbuf.fill_rect(0, 0, sw, sh, 0);
@@ -113,7 +160,7 @@ fn _temp_paint_palette(scrbuf: &mut ScreenBuffer) {
     for y in 0..16 {
         for x in 0..16 {
             let c = cidx as u8;
-            scrbuf.fill_rect(x * 10, y * 10, 9, 9, c);
+            scrbuf.fill_rect(x * SQSIZE, y * SQSIZE, SQSIZE - 1, SQSIZE - 1, c);
             cidx += 1;
         }
     }
