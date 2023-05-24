@@ -5,8 +5,10 @@
 //#![cfg_attr(not(any(test, debug_assertions)), windows_subsystem = "windows")]
 
 /*
-TODO - implementation steps for ROLF3D:
-    * load graphics assets and paint them
+    TODO - implementation steps for ROLF3D:
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    * (NEXT) load graphics assets and paint them
     * add display text (of any color)
 
     * load maps and sketch them (just colored rctangles, for now)
@@ -54,7 +56,7 @@ fn main() {
     // main game loop
     let sdl_config = SdlConfiguration::new("ROLF3D", SCR_WIDTH, SCR_HEIGHT, PIXEL_SIZE, SLEEP_KIND);
     let mut gameloop = GameLoop::new(SCR_WIDTH as usize, SCR_HEIGHT as usize);
-    let result = run_sdl_loop(&sdl_config, &mut gameloop);
+    let result = run_game_loop(&sdl_config, &mut gameloop);
 
     match result {
         Ok(_) => println!("ROLF3D finished OK :)"),

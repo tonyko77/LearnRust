@@ -1,12 +1,28 @@
 //! SDL2 wrapper, to simplify using SDL2
 
-use crate::painter::*;
-
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
-
 use std::time::{Duration, Instant};
+
+//-----------------
+
+/// Structure for an RGB color.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct RGB {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8,
+}
+
+impl RGB {
+    #[inline]
+    pub fn from(r: u8, g: u8, b: u8) -> Self {
+        RGB { r, g, b }
+    }
+}
+
+//-----------------
 
 /// Enum for if/how to slep during each game loop execution.
 #[derive(PartialEq, Eq)]
@@ -15,6 +31,23 @@ pub enum SleepKind {
     YIELD,
     SLEEP(u32),
 }
+
+//-----------------
+
+/// Painter interface, to be passed to client code so it can perform painting.
+/// *This is not meant to be implemented by client code.*
+pub trait Painter {
+    /// Get the width of the screen, in pixels.
+    fn get_screen_width(&self) -> i32;
+
+    /// Get the height of the screen, in pixels.
+    fn get_screen_height(&self) -> i32;
+
+    /// Draw a single pixel.
+    fn draw_pixel(&mut self, x: i32, y: i32, color: RGB);
+}
+
+//-----------------
 
 /// The configuration to be used for initializing SDL.
 pub struct SdlConfiguration {
@@ -63,8 +96,8 @@ pub trait GraphicsLoop {
     fn paint(&self, painter: &mut dyn Painter);
 }
 
-/// Main function to run the continuous SDL loop
-pub fn run_sdl_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> Result<(), String> {
+/// Main function to run the continuous game loop.
+pub fn run_game_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) -> Result<(), String> {
     assert!(cfg.scr_width > 0);
     assert!(cfg.scr_height > 0);
     assert!(cfg.pixel_size > 0);
