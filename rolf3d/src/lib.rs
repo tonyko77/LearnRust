@@ -1,11 +1,13 @@
 //! ROLF3D - a Rust implementation of the WOLF3D raycasting engine :)
 //! Main library.
 
-mod sdl_wrapper;
-mod scrbuf;
+mod assetloader;
 mod gameloop;
+mod scrbuf;
+mod sdl_wrapper;
 
 // TODO remove "pub" from internal modules
-pub use sdl_wrapper::*;
-pub use scrbuf::*;
+pub use assetloader::*;
 pub use gameloop::*;
+pub use scrbuf::*;
+pub use sdl_wrapper::*;

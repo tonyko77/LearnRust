@@ -7,11 +7,12 @@
 /*
     TODO - implementation steps for ROLF3D:
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    * (IN PROGRESS) load maps and sketch them
+        - just colored rectangles (for now)
 
-    * (NEXT) load graphics assets and paint them
+    * load graphics assets and paint them
     * add display text (of any color)
 
-    * load maps and sketch them (just colored rctangles, for now)
     * Automap:
         - display walls/doors etc using actual graphics
         - display things using actual graphics
@@ -48,10 +49,8 @@ const PIXEL_SIZE: i32 = 2;
 const SLEEP_KIND: SleepKind = SleepKind::YIELD;
 
 fn main() {
-    // TODO load the game assets !!
-    // let wad_data = WadData::load(WAD_PATH, true)?;
-    // let cfg = GameConfig::new(wad_data, SCR_WIDTH, SCR_HEIGHT);
-    // let mut doom_game = DoomGame::new(cfg)?;
+    // load and prepare game assets
+    let _assets = GameAssets::load().expect("ERROR in ROLF3D: failed to load game assets");
 
     // main game loop
     let sdl_config = SdlConfiguration::new("ROLF3D", SCR_WIDTH, SCR_HEIGHT, PIXEL_SIZE, SLEEP_KIND);
