@@ -1,6 +1,6 @@
 //! Main game loop
 
-use crate::{ScreenBuffer, GraphicsLoop, Painter};
+use crate::{GraphicsLoop, Painter, ScreenBuffer};
 use sdl2::event::Event;
 // TODO use sdl2::keyboard::Keycode;
 
@@ -13,10 +13,6 @@ impl GameLoop {
         Self {
             scrbuf: ScreenBuffer::new(width, height),
         }
-    }
-
-    pub fn run_loop(&mut self) {
-
     }
 }
 
@@ -44,14 +40,15 @@ impl GraphicsLoop for GameLoop {
 fn _temp_paint(scrbuf: &mut ScreenBuffer) {
     let sw = scrbuf.width() as i32;
     let sh = scrbuf.height() as i32;
-    scrbuf.fill_rect(0, 0, sw, sh, 128);
+    scrbuf.fill_rect(0, 0, sw, sh, 0);
 
-    scrbuf.put_pixel(10, 10, 254);
-    scrbuf.fill_rect(11, 11, 2, 2, 0);
-    scrbuf.put_pixel(13, 13, 254);
-
-    scrbuf.fill_rect(-3, -3, 6, 6, 10);
-    scrbuf.fill_rect(-3, sh-3, 6, 6, 20);
-    scrbuf.fill_rect(sw-3, -3, 6, 6, 30);
-    scrbuf.fill_rect(sw-3, sh-3, 6, 6, 40);
+    // paint the palette
+    let mut cidx: i32 = 0;
+    for y in 0..16 {
+        for x in 0..16 {
+            let c = cidx as u8;
+            scrbuf.fill_rect(x * 10, y * 10, 9, 9, c);
+            cidx += 1;
+        }
+    }
 }

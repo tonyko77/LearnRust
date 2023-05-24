@@ -6,11 +6,10 @@
 
 /*
 TODO - implementation steps for ROLF3D:
-    * (in progress) basic painting via ScreenBuffer
-    * load palette from GAMEPAL.OBJ + hardcode it + display it
     * load graphics assets and paint them
-        - display text capability
-    * load maps and sketch them
+    * add display text (of any color)
+
+    * load maps and sketch them (just colored rctangles, for now)
     * Automap:
         - display walls/doors etc using actual graphics
         - display things using actual graphics
@@ -19,10 +18,12 @@ TODO - implementation steps for ROLF3D:
         - mouse horizontal turn
         - mouse buttons
         - collision detection (with walls)
+
     * 3D View / Raycaster
         - walls and doors
         - sprites (actors, decorations)
         - movement through the 3D world
+
     * Gameplay
         - key handling (e.g. Tab = Automap)
         - open doors !!
@@ -33,7 +34,8 @@ TODO - implementation steps for ROLF3D:
         - Menu system (may be simplified)
 
 DONE:
-    - nothing yet ...
+    * basic painting via ScreenBuffer
+    * load palette from GAMEPAL.OBJ + hardcode it + display it
 */
 
 use rolf3d::*;
