@@ -69,7 +69,7 @@ impl GameAssets {
 //----------------------
 
 /// All the supported asset file extensions.
-const EXTENSIONS: &[&'static str] = &["WL6", "SOD", "WL3", "WL1", "SDM"];
+const EXTENSIONS: &[&'static str] = &["WL6", "WL1", "SOD", "SDM"];
 
 /// All the supported asset file names.
 const FILES: &[&'static str] = &["MAPHEAD", "GAMEMAPS", "VGADICT", "VGAHEAD", "VGAGRAPH", "VSWAP"];
@@ -122,6 +122,7 @@ fn load_vswap(ext: &str, mutbuf: &mut [u8]) -> Result<(Vec<GfxData>, Vec<GfxData
     }
     // first come the wall chunks
     let mut vec_walls = Vec::with_capacity(idx_sprite_start);
+    let mut cnt = 0;
     for i in 0..idx_sprite_start {
         let ofs = vec_offsets[i];
         let len = vec_lengths[i];
@@ -131,11 +132,15 @@ fn load_vswap(ext: &str, mutbuf: &mut [u8]) -> Result<(Vec<GfxData>, Vec<GfxData
             // read the wall - it is stored as columns
             let pixels = vswap[ofs..ofs + len].iter().cloned().collect();
             vec_walls.push(GfxData::new_wall(pixels));
+            cnt += 1;
         } else {
             vec_walls.push(GfxData::new_wall(vec![]));
         }
     }
+    println!("[ROLF3D] Loaded {cnt}/{} wall flats", vec_walls.len());
+
     // next come the sprites
+    cnt = 0;
     let mut vec_sprites = Vec::with_capacity(idx_sound_start - idx_sprite_start);
     for i in idx_sprite_start..idx_sound_start {
         let ofs = vec_offsets[i];
@@ -143,10 +148,12 @@ fn load_vswap(ext: &str, mutbuf: &mut [u8]) -> Result<(Vec<GfxData>, Vec<GfxData
         if ofs > 0 && len > 0 {
             let pixels = parse_sprite(&vswap[ofs..ofs + len]);
             vec_sprites.push(GfxData::new_sprite(pixels));
+            cnt += 1;
         } else {
             vec_sprites.push(GfxData::new_sprite(vec![]));
         }
     }
+    println!("[ROLF3D] Loaded {cnt}/{} sprites", vec_sprites.len());
 
     Ok((vec_walls, vec_sprites))
 }
@@ -334,13 +341,124 @@ fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<Vec<GfxData>, String> {
     let vgahead = &mutbuf[len1..len1 + len2];
     let vgagraph = &mutbuf[len1 + len2..len1 + len2 + len3];
     // ... and prepare the results vector
-    let cnt_pics = len2 / 3;
-    assert_eq!(cnt_pics * 3, len2);
-    let pics = Vec::with_capacity(cnt_pics);
+    let cnt_chunks = (len2 / 3) - 1;
+    assert_eq!(cnt_chunks * 3 + 3, len2);
 
-    // TODO implement this ...
+    // the VGADICT file is an array of WORD pairs - first for bit=0, second for bit=1:
+    //     struct huffnode { unsigned bit0, bit1; }  --> 0-255 is a character, > is a pointer to a node
+    //     (bitx values > 266 => are indexes within this table, just subtract 256 from them)
+    // we just collect them as a list of words, and each pair of words corresponds to (bit0, bit1)
+    let mut huffnodes = Vec::with_capacity(len1 / 2);
+    for i in 0..len1 / 2 {
+        huffnodes.push(buf_to_u16(&vgadict[2 * i..]));
+    }
+    assert_eq!(512, huffnodes.len());
+
+    // the VGAHEAD file is an array of 3-byte, little endian offsets into VGAGRAPH
+    // the first is 0, the last one is the offset of the end of the VGAGRAPH file
+    // we just collect them as a list of offsets
+    let mut offsets = Vec::with_capacity(1 + cnt_chunks);
+    for i in 0..=cnt_chunks {
+        let b1 = vgahead[3 * i] as usize;
+        let b2 = vgahead[3 * i + 1] as usize;
+        let b3 = vgahead[3 * i + 2] as usize;
+        let ofs = b1 | (b2 << 8) | (b3 << 16);
+        offsets.push(ofs);
+    }
+
+    // finally, VGAGRAPH contains the Huffman-encoded data for each pic
+    // BUT: pictures start at index 3, and their indexes are GAME SPECIFIC
+    // (see GFXV_xxx.H/EQU files in the original sources)
+
+    // Chunk #0 (STRUCTPIC) contains the pic dimensions
+    // It contains NUMPIC entries; for each entry, there are 2 words: width, height
+    let o1 = offsets[0];
+    let o2 = offsets[1];
+    let bytes = &vgagraph[o1..o2];
+    let decoded = huff_decode_chunk(bytes, &huffnodes);
+    let cnt_words = decoded.len() / 2;
+    let mut pic_sizes = Vec::with_capacity(cnt_words);
+    for i in 0..cnt_words {
+        let w = buf_to_u16(&decoded[2 * i..]);
+        pic_sizes.push(w);
+    }
+
+    // Next, try to decode each pic
+    let cnt_pics = cnt_words / 2;
+    let mut pics = Vec::with_capacity(cnt_pics);
+    let mut cnt = 0;
+    for i in 0..cnt_pics {
+        let width = pic_sizes[2 * i];
+        let height = pic_sizes[2 * i + 1];
+        let o1 = offsets[i + 1];
+        let o2 = offsets[i + 2];
+        let bytes = &vgagraph[o1..o2];
+        let pixels = huff_decode_chunk(bytes, &huffnodes);
+
+        // TODO - NOT WORKING - size mismatches in the PICs !?!?!
+        // ALSO: pics are "mangled :(("
+        // => HOW TO DECODE A PIC ?????
+        let expected_len = (width as usize) * (height as usize);
+        if expected_len == pixels.len() {
+            let pic = GfxData::new_pic(width, height, pixels);
+            pics.push(pic);
+            cnt += 1;
+        } else {
+            println!(
+                "[WARN] PIC size mismatch: w={width}, h={height} => exp.len={expected_len}, but actual len={}",
+                pixels.len()
+            );
+        }
+    }
+    println!("[ROLF3D] Loaded {cnt}/{cnt_pics} pics");
 
     Ok(pics)
+}
+
+/// Huffman decoding for pictures
+/// -> see [CAL_SetupGrFile](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_CA.C#L872)
+/// and [CAL_HuffExpand](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_CA.C#L409)
+fn huff_decode_chunk(bytes: &[u8], huff_dict: &[u16]) -> Vec<u8> {
+    // read the decoded size (4 bytes)
+    let decoded_size = buf_to_u32(bytes) as usize;
+    let mut decoded = Vec::with_capacity(decoded_size);
+
+    // ok to decode data
+    // TODO (!!) there is a "screen hack" in the original source
+    let mut src_idx = 4;
+    // root node of Huffman tree is always at index 254 (and 255 is unused)
+    let mut huff_idx = 254;
+    let mut current_byte = bytes[src_idx];
+    let mut bit_mask = 1;
+    while decoded.len() < decoded_size && src_idx < bytes.len() {
+        // check current bit
+        let is_zero_bit = (current_byte & bit_mask) == 0;
+        let huff_target = if is_zero_bit {
+            huff_dict[2 * huff_idx]
+        } else {
+            huff_dict[2 * huff_idx + 1]
+        };
+        // advance to next bit / byte
+        if bit_mask == 0x80 {
+            bit_mask = 1;
+            src_idx += 1;
+            current_byte = bytes[src_idx];
+        } else {
+            bit_mask = bit_mask << 1;
+        }
+        // act based on huff data
+        if huff_target < 256 {
+            // it's a byte value
+            decoded.push((huff_target & 0xFF) as u8);
+            huff_idx = 254;
+        } else {
+            // it's an index to another node
+            huff_idx = (huff_target & 0xFF) as usize;
+        }
+    }
+
+    assert_eq!(decoded_size, decoded.len());
+    decoded
 }
 
 //--------------

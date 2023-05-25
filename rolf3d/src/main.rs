@@ -9,9 +9,8 @@
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     * (IN PROGRESS) load graphics assets
-    + test-paint gfx assets - use <Tab> to switch between automap and Gfx
         -> STILL TO DO: vgadict/vgahead/vgagraph
-
+    * identify PIC indexes based on game type (WL1, WL6, SOD, SDM)
     * add display text (of any color)
 
     * Automap:
@@ -47,6 +46,7 @@
     * basic painting via ScreenBuffer
     * load palette from GAMEPAL.OBJ + hardcode it + display it
     * load maps and sketch them (just colored rectangles, for now)
+    * test-paint gfx assets - use <Tab> to switch between automap and Gfx
 */
 
 use rolf3d::*;

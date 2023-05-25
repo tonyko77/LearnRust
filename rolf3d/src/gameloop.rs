@@ -111,7 +111,7 @@ fn _temp_paint_gfx(zelf: &mut GameLoop) {
     _temp_paint_palette(&mut zelf.scrbuf);
 
     let x0 = (zelf.scrbuf.width() - 72) as i32;
-    let y0 = (zelf.scrbuf.height() - 80) as i32;
+    let y0 = (zelf.scrbuf.height() - 200) as i32;
 
     // paint wall
     let wallidx = zelf.tmp_idx % zelf.assets.walls.len();
@@ -123,7 +123,10 @@ fn _temp_paint_gfx(zelf: &mut GameLoop) {
     let sprite = &zelf.assets.sprites[sprtidx];
     _temp_paint_pic(sprite, x0, y0, &mut zelf.scrbuf);
 
-    // TODO paint pics !!
+    // paint pics
+    let picidx = zelf.tmp_idx % zelf.assets.pics.len();
+    let pic = &zelf.assets.pics[picidx];
+    _temp_paint_pic(pic, 0, y0, &mut zelf.scrbuf);
 }
 
 // TODO temporary paint a graphic
