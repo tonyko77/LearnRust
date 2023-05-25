@@ -8,45 +8,51 @@
 
 //-----------------------
 
-/// Graphics types
-// TODO is this really needed ??
-pub enum GfxType {
-    WALL,
-    SPRITE,
-    PIC,
-}
+use crate::ScreenBuffer;
 
 /// Graphics - contains walls, sprites and miscellaneous (fonts, PICs etc)
 /// Each pic is stored as columns, then rows (flipped)
 pub struct GfxData {
-    pub gtype: GfxType,
-    pub width: u16,
-    pub height: u16,
-    pub pixels: Vec<u8>,
+    width: u16,
+    height: u16,
+    pixels: Vec<u8>,
 }
 
 impl GfxData {
-    pub fn new_wall(pixels: Vec<u8>) -> Self {
-        let wh = if pixels.is_empty() { 0 } else { 64 };
-        Self::new(GfxType::WALL, wh, wh, pixels)
-    }
-
+    #[inline]
     pub fn new_sprite(pixels: Vec<u8>) -> Self {
-        let wh = if pixels.is_empty() { 0 } else { 64 };
-        Self::new(GfxType::SPRITE, wh, wh, pixels)
+        Self::new_pic(64, 64, pixels)
     }
 
+    #[inline]
     pub fn new_pic(width: u16, height: u16, pixels: Vec<u8>) -> Self {
-        Self::new(GfxType::PIC, width, height, pixels)
+        assert_eq!((width * height) as usize, pixels.len());
+        Self { width, height, pixels }
     }
 
-    fn new(gtype: GfxType, width: u16, height: u16, pixels: Vec<u8>) -> Self {
-        assert_eq!((width * height) as usize, pixels.len());
+    #[inline]
+    pub fn new_empty() -> Self {
         Self {
-            gtype,
-            width,
-            height,
-            pixels,
+            width: 0,
+            height: 0,
+            pixels: vec![],
+        }
+    }
+
+    #[inline]
+    pub fn size(&self) -> (u16, u16) {
+        (self.width, self.height)
+    }
+
+    pub fn draw(&self, x: i32, y: i32, scrbuf: &mut ScreenBuffer) {
+        let w = self.width as i32;
+        let h = self.height as i32;
+        let mut idx = 0;
+        for dx in 0..w {
+            for dy in 0..h {
+                scrbuf.put_pixel(x + dx, y + dy, self.pixels[idx]);
+                idx += 1;
+            }
         }
     }
 }
@@ -54,37 +60,55 @@ impl GfxData {
 //-----------------------
 
 pub struct FontData {
-    pub font_height: u16,
-    pub space_width: u16,
-    pub char_pixels: Vec<Vec<u8>>,
+    font_height: u16,
+    space_width: u16,
+    offs_widths: Vec<u16>,
+    pixels: Vec<u8>,
 }
 
 impl FontData {
-    pub fn new(font_height: u16, space_width: u16) -> Self {
+    pub fn new(font_height: u16, space_width: u16, offs_widths: Vec<u16>, pixels: Vec<u8>) -> Self {
         Self {
             font_height,
             space_width,
-            char_pixels: Vec::with_capacity(100),
+            offs_widths,
+            pixels,
         }
     }
 
-    #[inline]
-    pub fn add_char_data(&mut self, pixels: Vec<u8>) {
-        self.char_pixels.push(pixels)
+    pub fn draw_text(&self, x: i32, y: i32, text: &str, color: u8, scrbuf: &mut ScreenBuffer) -> i32 {
+        let mut dx = 0;
+        for ch in text.bytes() {
+            let cw = self.draw_char(x + dx, y, ch, color, scrbuf);
+            dx += cw;
+        }
+        dx
     }
 
-    pub fn char_width(&self, ch: u8) -> u16 {
+    pub fn draw_char(&self, x: i32, y: i32, ch: u8, color: u8, scrbuf: &mut ScreenBuffer) -> i32 {
+        // if not a drawable char => just skip it
+        if ch < 32 || ch > 127 {
+            return 0;
+        }
+        // if a space => draw nothing, just return its width
         if ch == 32 {
-            return self.space_width;
+            return self.space_width as i32;
         }
-        if ch >= 33 {
-            let idx = (ch - 33) as usize;
-            if idx < self.char_pixels.len() {
-                return (self.char_pixels[idx].len() as u16) / self.font_height;
+        // ok to draw
+        let idx = ((ch - 33) as usize) * 2;
+        let mut ofs = self.offs_widths[idx] as usize; // first word = offset inside pixels
+        let width = self.offs_widths[idx + 1] as i32; // second word = width of character
+        let height = self.font_height as i32;
+        for dx in 0..width {
+            for dy in 0..height {
+                if 0 != self.pixels[ofs] {
+                    scrbuf.put_pixel(x + dx, y + dy, color);
+                }
+                ofs += 1;
             }
         }
-        // not a valid char => no width
-        0
+
+        width
     }
 }
 

@@ -8,8 +8,6 @@
   TODO - implementation steps for ROLF3D:
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    * (NEXT) add display of text (of any color)
-
     * Map investigations:
         - What is the meaning of each WALL and THING word, in the map arrays ?!?
         - Is plane #3 really used/needed? and is it really empty for ALL maps in WL1/WL6/SOD ??
@@ -30,11 +28,12 @@
         - sprites (actors, decorations)
         - movement through the 3D world
 
-
-    * (IS THIS NEEDED ?) identify PIC indexes based on game type (WL1, WL6, SOD, SDM)
     * Gameplay
         - key handling (e.g. Tab = Automap)
         - open doors !!
+
+    * (IS THIS NEEDED ?) identify PIC indexes based on game type (WL1, WL6, SOD, SDM)
+        - seems to matter only if I want to reproduce EXACTLY the original game
 
     * Enemy AI
         - shoot/knife enemies
@@ -50,6 +49,7 @@
     * load maps and sketch them (just colored rectangles, for now)
     * load graphics assets: VSWAP (flats and sprites) + VGAGRAPH (fonts and pics)
     * test-paint gfx assets - use <Tab> to switch between automap and Gfx
+    * draw text
 */
 
 use rolf3d::*;

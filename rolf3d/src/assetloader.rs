@@ -118,10 +118,10 @@ fn load_vswap(ext: &str, mutbuf: &mut [u8]) -> Result<(Vec<GfxData>, Vec<GfxData
             assert_eq!(64 * 64, len);
             // read the wall - it is stored as columns
             let pixels = vswap[ofs..ofs + len].iter().cloned().collect();
-            vec_walls.push(GfxData::new_wall(pixels));
+            vec_walls.push(GfxData::new_sprite(pixels));
             cnt += 1;
         } else {
-            vec_walls.push(GfxData::new_wall(vec![]));
+            vec_walls.push(GfxData::new_empty());
         }
     }
     println!("[ROLF3D] Loaded {cnt}/{} wall flats", vec_walls.len());
@@ -137,7 +137,7 @@ fn load_vswap(ext: &str, mutbuf: &mut [u8]) -> Result<(Vec<GfxData>, Vec<GfxData
             vec_sprites.push(GfxData::new_sprite(pixels));
             cnt += 1;
         } else {
-            vec_sprites.push(GfxData::new_sprite(vec![]));
+            vec_sprites.push(GfxData::new_empty());
         }
     }
     println!("[ROLF3D] Loaded {cnt}/{} sprites", vec_sprites.len());
@@ -407,27 +407,29 @@ fn parse_font(fontbytes: &[u8]) -> FontData {
     // fontstruct { int height; int location[256]; char width[256]; }
     let font_height = buf_to_u16(&fontbytes);
     let space_width = fontbytes[32 + 512 + 2] as u16;
-    let mut font = FontData::new(font_height, space_width);
-    for j in 33..129 {
+    let mut offs_widths = Vec::with_capacity(95);
+    let mut pixels = Vec::with_capacity((font_height * font_height * 100) as usize);
+    for j in 33..128 {
         let loc = buf_to_u16(&fontbytes[2 + 2 * j..]) as usize;
         let char_width = fontbytes[j + 514] as u16;
         if loc == 0 || char_width == 0 {
             break;
         }
+        // put the offset and width together, in the same vector
+        offs_widths.push(pixels.len() as u16);
+        offs_widths.push(char_width);
         // pixels are flipped (rows first) => un-flip them
         let len = (font_height * char_width) as usize;
         let flipped = &fontbytes[loc..loc + len];
-        let mut pixels = Vec::with_capacity(len);
         for x in 0..char_width {
             for y in 0..font_height {
                 let idx = (y * char_width + x) as usize;
                 pixels.push(flipped[idx]);
             }
         }
-        font.add_char_data(pixels);
     }
 
-    font
+    FontData::new(font_height, space_width, offs_widths, pixels)
 }
 
 /// PICs are separated into planes => de-separate it
