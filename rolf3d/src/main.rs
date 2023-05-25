@@ -8,14 +8,13 @@
   TODO - implementation steps for ROLF3D:
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    * (IN PROGRESS) load graphics assets
-        - PARSE FONTS into a separate list !!
-        -> STILL TO DO: vgadict/vgahead/vgagraph
-    * identify PIC indexes based on game type (WL1, WL6, SOD, SDM)
-    * add display text (of any color)
+    * (NEXT) add display of text (of any color)
+
+    * Map investigations:
+        - What is the meaning of each WALL and THING word, in the map arrays ?!?
+        - Is plane #3 really used/needed? and is it really empty for ALL maps in WL1/WL6/SOD ??
 
     * Automap:
-        - INVESTIGATE: the meaning of each WALL and THING value ?!?
         - display walls/doors etc using actual graphics
         - display things using actual graphics
 
@@ -31,6 +30,8 @@
         - sprites (actors, decorations)
         - movement through the 3D world
 
+
+    * (IS THIS NEEDED ?) identify PIC indexes based on game type (WL1, WL6, SOD, SDM)
     * Gameplay
         - key handling (e.g. Tab = Automap)
         - open doors !!
@@ -47,6 +48,7 @@
     * basic painting via ScreenBuffer
     * load palette from GAMEPAL.OBJ + hardcode it + display it
     * load maps and sketch them (just colored rectangles, for now)
+    * load graphics assets: VSWAP (flats and sprites) + VGAGRAPH (fonts and pics)
     * test-paint gfx assets - use <Tab> to switch between automap and Gfx
 */
 

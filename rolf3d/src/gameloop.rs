@@ -1,6 +1,6 @@
 //! Main game loop
 
-use crate::{GameAssets, GfxData, GraphicsLoop, Painter, ScreenBuffer};
+use crate::*;
 use sdl2::{event::Event, keyboard::Keycode};
 
 pub struct GameLoop {
@@ -127,6 +127,29 @@ fn _temp_paint_gfx(zelf: &mut GameLoop) {
     let picidx = zelf.tmp_idx % zelf.assets.pics.len();
     let pic = &zelf.assets.pics[picidx];
     _temp_paint_pic(pic, 0, y0, &mut zelf.scrbuf);
+
+    // paint fonts
+    let font_idx = zelf.tmp_idx % 100;
+    _temp_paint_font_char(&zelf.assets.font1, font_idx, 170, 10, &mut zelf.scrbuf);
+    _temp_paint_font_char(&zelf.assets.font2, font_idx, 170, 30, &mut zelf.scrbuf);
+}
+
+// TODO temporary paint a font char
+fn _temp_paint_font_char(fnt: &FontData, charidx: usize, x0: i32, y0: i32, scrbuf: &mut ScreenBuffer) {
+    const PIX_ON: u8 = 14;
+    const PIX_OFF: u8 = 1;
+    let ch = (charidx + 33) as u8;
+    let w = fnt.char_width(ch) as i32;
+    let h = fnt.font_height as i32;
+    let mut pixidx = 0;
+    for x in 0..w {
+        for y in 0..h {
+            let c = fnt.char_pixels[charidx][pixidx];
+            let pix = if c == 0 { PIX_OFF } else { PIX_ON };
+            scrbuf.put_pixel(x + x0, y + y0, pix);
+            pixidx += 1;
+        }
+    }
 }
 
 // TODO temporary paint a graphic

@@ -6,7 +6,10 @@
 //  -> plane #1 seems to contain WALLS, plane #2 seems to contain THINGS
 //  -> plane #3 seems to ALWAYS have 0-s => NOT USED ?!?, check SOD, WL6 etc
 
+//-----------------------
+
 /// Graphics types
+// TODO is this really needed ??
 pub enum GfxType {
     WALL,
     SPRITE,
@@ -47,6 +50,45 @@ impl GfxData {
         }
     }
 }
+
+//-----------------------
+
+pub struct FontData {
+    pub font_height: u16,
+    pub space_width: u16,
+    pub char_pixels: Vec<Vec<u8>>,
+}
+
+impl FontData {
+    pub fn new(font_height: u16, space_width: u16) -> Self {
+        Self {
+            font_height,
+            space_width,
+            char_pixels: Vec::with_capacity(100),
+        }
+    }
+
+    #[inline]
+    pub fn add_char_data(&mut self, pixels: Vec<u8>) {
+        self.char_pixels.push(pixels)
+    }
+
+    pub fn char_width(&self, ch: u8) -> u16 {
+        if ch == 32 {
+            return self.space_width;
+        }
+        if ch >= 33 {
+            let idx = (ch - 33) as usize;
+            if idx < self.char_pixels.len() {
+                return (self.char_pixels[idx].len() as u16) / self.font_height;
+            }
+        }
+        // not a valid char => no width
+        0
+    }
+}
+
+//-----------------------
 
 /// Map data - contains walls/doors and things.
 pub struct MapData {

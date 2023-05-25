@@ -11,33 +11,19 @@
 //! * [WOLF3D original sources on GitHub](https://github.com/id-Software/wolf3d)
 //!     * [Maps - CAL_CarmackExpand](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_CA.C#L609)
 //!     * [VSWAP - PML_OpenPageFile](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_PM.C#L500)
-
-/*
-Findings about file formats:
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-VSWAP -> see https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_PM.C#L500
-    -> ALSO SEE!!! https://devinsmith.net/backups/bruce/wolf3d.html
-
-    OFFS    SIZE                    Contents
-    ------------------------------------------------------------------------------
-    0       u16                     ChunksInFile = number of chunks in the file
-    2       u16                     PMSpriteStart = !?
-    4       u16                     PMSoundStart = !?
-    6       ChunksInFile * u32      Offsets for each chunk (may be 0)
-    ...     ChunksInFile * u16      Lengths for each chunk (may be 0)
-    ...     ...                     Actual chunks - seem to be UNCOMPRESSED !?
-*/
+//!     * [CAL_SetupGrFile](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_CA.C#L872)
+//!     * [CAL_HuffExpand](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_CA.C#L409)
 
 use crate::assets::*;
 use crate::utils::*;
 
 /// Holds all the assets loaded from the game files.
 pub struct GameAssets {
-    pub game_type: &'static str,
     pub maps: Vec<MapData>,
     pub walls: Vec<GfxData>,
     pub sprites: Vec<GfxData>,
+    pub font1: FontData,
+    pub font2: FontData,
     pub pics: Vec<GfxData>,
 }
 
@@ -51,14 +37,15 @@ impl GameAssets {
         let game_type = detect_game_type()?;
         let maps = load_maps(game_type, &mut mutbuf)?;
         let (walls, sprites) = load_vswap(game_type, &mut mutbuf)?;
-        let pics = load_pics(game_type, &mut mutbuf)?;
+        let (font1, font2, pics) = load_pics(game_type, &mut mutbuf)?;
 
         // build the asset holder
         Ok(Self {
-            game_type,
             maps,
             walls,
             sprites,
+            font1,
+            font2,
             pics,
         })
     }
@@ -330,7 +317,7 @@ fn decompress_map_plane(chunk: &[u8], rlew_tag: u16) -> Vec<u16> {
 // Pic loader - VGADICT, VGAHEAD, VGAGRAPH
 //--------------------------------------------
 
-fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<Vec<GfxData>, String> {
+fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<(FontData, FontData, Vec<GfxData>), String> {
     // load the 3 files ...
     let len1 = load_file(VGADICT, ext, mutbuf)?;
     assert_eq!(1024, len1);
@@ -371,7 +358,7 @@ fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<Vec<GfxData>, String> {
     // (see GFXV_xxx.H/EQU files in the original sources)
 
     // Chunk #0 (STRUCTPIC) contains the pic dimensions
-    // It contains NUMPIC entries; for each entry, there are 2 words: width, height
+    // It contains NUMPIC entries: for each PIC entry => 2 words: (width, height)
     let o1 = offsets[0];
     let o2 = offsets[1];
     let bytes = &vgagraph[o1..o2];
@@ -383,47 +370,28 @@ fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<Vec<GfxData>, String> {
         pic_sizes.push(w);
     }
 
-    // TODO Chunks #1 and #2 are FONTS => PARSE FONTS
-    let mut fonts = Vec::with_capacity(1024); // TODO TEMP !! - put FONTS in a SEPARATE struct
-    for i in 1..=2 {
-        let o1 = offsets[i];
-        let o2 = offsets[i + 1];
-        let bytes = &vgagraph[o1..o2];
-        let fontdata = huff_decode_chunk(bytes, &huffnodes);
+    // Chunks #1 and #2 are fonts => parse them
+    let o1 = offsets[1];
+    let o2 = offsets[2];
+    let o3 = offsets[3];
+    // font #1
+    let bytes = &vgagraph[o1..o2];
+    let fontdata = huff_decode_chunk(bytes, &huffnodes);
+    let font1 = parse_font(&fontdata);
+    // font #2
+    let bytes = &vgagraph[o2..o3];
+    let fontdata = huff_decode_chunk(bytes, &huffnodes);
+    let font2 = parse_font(&fontdata);
 
-        // TODO ?? fontstruct { int height; int location[256]; char width[256]; }
-        let font_height = buf_to_u16(&fontdata);
-        for j in 32..192 {
-            let loc = buf_to_u16(&fontdata[2 + 2 * j..]) as usize;
-            let char_width = fontdata[j + 514] as u16;
-            if loc > 0 || char_width > 0 {
-                // TODO TEMP make the font char into a pic, just so I can see it :)))
-                let len = (font_height * char_width) as usize;
-                // pixels are flipped (rows first) => un-flip them
-                let flipped = &fontdata[loc..loc + len];
-                let mut pixels = Vec::with_capacity(len);
-                for x in 0..char_width {
-                    for y in 0..font_height {
-                        let idx = (y * char_width + x) as usize;
-                        pixels.push(flipped[idx]);
-                    }
-                }
-                let char_pic = GfxData::new_pic(char_width, font_height, pixels);
-                fonts.push(char_pic);
-            }
-        }
-    }
-
-    // decode each pic
+    // decode each pic - they start from chunk #3
     let cnt_pics = cnt_words / 2;
     let mut pics = Vec::with_capacity(cnt_pics);
     for i in 0..cnt_pics {
-        let width = pic_sizes[2 * i];
-        let height = pic_sizes[2 * i + 1];
-        // all PICs start from chunk #3 !!
         let o1 = offsets[i + 3];
         let o2 = offsets[i + 4];
         let bytes = &vgagraph[o1..o2];
+        let width = pic_sizes[2 * i];
+        let height = pic_sizes[2 * i + 1];
         let mut pixels = huff_decode_chunk(bytes, &huffnodes);
         munge_pic(width, height, &mut pixels);
         let pic = GfxData::new_pic(width, height, pixels);
@@ -431,7 +399,66 @@ fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<Vec<GfxData>, String> {
     }
     println!("[ROLF3D] Loaded {cnt_pics} pics");
 
-    Ok(pics)
+    Ok((font1, font2, pics))
+}
+
+/// Parse a font data from Huffman-decoded bytes.
+fn parse_font(fontbytes: &[u8]) -> FontData {
+    // fontstruct { int height; int location[256]; char width[256]; }
+    let font_height = buf_to_u16(&fontbytes);
+    let space_width = fontbytes[32 + 512 + 2] as u16;
+    let mut font = FontData::new(font_height, space_width);
+    for j in 33..129 {
+        let loc = buf_to_u16(&fontbytes[2 + 2 * j..]) as usize;
+        let char_width = fontbytes[j + 514] as u16;
+        if loc == 0 || char_width == 0 {
+            break;
+        }
+        // pixels are flipped (rows first) => un-flip them
+        let len = (font_height * char_width) as usize;
+        let flipped = &fontbytes[loc..loc + len];
+        let mut pixels = Vec::with_capacity(len);
+        for x in 0..char_width {
+            for y in 0..font_height {
+                let idx = (y * char_width + x) as usize;
+                pixels.push(flipped[idx]);
+            }
+        }
+        font.add_char_data(pixels);
+    }
+
+    font
+}
+
+/// PICs are separated into planes => de-separate it
+/// -> see [VL_MungePic](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_VH.C#L163)
+fn munge_pic(width: u16, height: u16, pixels: &mut Vec<u8>) {
+    let width = width as usize;
+    let plane_width = width / 4;
+    assert_eq!(plane_width * 4, width);
+
+    // first munge => this will result in a "flipped" pic ...
+    // (I am not smart enough to munge and flip in the same loop :/)
+    let mut flipped = vec![0; pixels.len()];
+    let mut srcidx = 0;
+    for plane in 0..4 {
+        let mut destidx = 0;
+        for _y in 0..height {
+            for x in 0..plane_width {
+                flipped[destidx + 4 * x + plane] = pixels[srcidx];
+                srcidx += 1;
+            }
+            destidx += width;
+        }
+    }
+    // ..., then flip it
+    let mut dest_idx = 0;
+    for x in 0..width {
+        for y in 0..height as usize {
+            pixels[dest_idx] = flipped[y * width + x];
+            dest_idx += 1;
+        }
+    }
 }
 
 /// Huffman decoding for pictures
@@ -478,37 +505,6 @@ fn huff_decode_chunk(bytes: &[u8], huff_dict: &[u16]) -> Vec<u8> {
 
     assert_eq!(decoded_size, decoded.len());
     decoded
-}
-
-/// PICs are separated into planes => de-separate it
-/// -> see [VL_MungePic](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_VH.C#L163)
-fn munge_pic(width: u16, height: u16, pixels: &mut Vec<u8>) {
-    let width = width as usize;
-    let plane_width = width / 4;
-    assert_eq!(plane_width * 4, width);
-
-    // first munge => this will result in a "flipped" pic ...
-    // (I am not smart enough to munge and flip in the same loop :/)
-    let mut flipped = vec![0; pixels.len()];
-    let mut srcidx = 0;
-    for plane in 0..4 {
-        let mut destidx = 0;
-        for _y in 0..height {
-            for x in 0..plane_width {
-                flipped[destidx + 4 * x + plane] = pixels[srcidx];
-                srcidx += 1;
-            }
-            destidx += width;
-        }
-    }
-    // ..., then flip it
-    let mut dest_idx = 0;
-    for x in 0..width {
-        for y in 0..height as usize {
-            pixels[dest_idx] = flipped[y * width + x];
-            dest_idx += 1;
-        }
-    }
 }
 
 //--------------
