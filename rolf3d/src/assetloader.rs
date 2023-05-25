@@ -383,34 +383,53 @@ fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<Vec<GfxData>, String> {
         pic_sizes.push(w);
     }
 
-    // Next, try to decode each pic
+    // TODO Chunks #1 and #2 are FONTS => PARSE FONTS
+    let mut fonts = Vec::with_capacity(1024); // TODO TEMP !! - put FONTS in a SEPARATE struct
+    for i in 1..=2 {
+        let o1 = offsets[i];
+        let o2 = offsets[i + 1];
+        let bytes = &vgagraph[o1..o2];
+        let fontdata = huff_decode_chunk(bytes, &huffnodes);
+
+        // TODO ?? fontstruct { int height; int location[256]; char width[256]; }
+        let font_height = buf_to_u16(&fontdata);
+        for j in 32..192 {
+            let loc = buf_to_u16(&fontdata[2 + 2 * j..]) as usize;
+            let char_width = fontdata[j + 514] as u16;
+            if loc > 0 || char_width > 0 {
+                // TODO TEMP make the font char into a pic, just so I can see it :)))
+                let len = (font_height * char_width) as usize;
+                // pixels are flipped (rows first) => un-flip them
+                let flipped = &fontdata[loc..loc + len];
+                let mut pixels = Vec::with_capacity(len);
+                for x in 0..char_width {
+                    for y in 0..font_height {
+                        let idx = (y * char_width + x) as usize;
+                        pixels.push(flipped[idx]);
+                    }
+                }
+                let char_pic = GfxData::new_pic(char_width, font_height, pixels);
+                fonts.push(char_pic);
+            }
+        }
+    }
+
+    // decode each pic
     let cnt_pics = cnt_words / 2;
     let mut pics = Vec::with_capacity(cnt_pics);
-    let mut cnt = 0;
     for i in 0..cnt_pics {
         let width = pic_sizes[2 * i];
         let height = pic_sizes[2 * i + 1];
-        let o1 = offsets[i + 1];
-        let o2 = offsets[i + 2];
+        // all PICs start from chunk #3 !!
+        let o1 = offsets[i + 3];
+        let o2 = offsets[i + 4];
         let bytes = &vgagraph[o1..o2];
-        let pixels = huff_decode_chunk(bytes, &huffnodes);
-
-        // TODO - NOT WORKING - size mismatches in the PICs !?!?!
-        // ALSO: pics are "mangled :(("
-        // => HOW TO DECODE A PIC ?????
-        let expected_len = (width as usize) * (height as usize);
-        if expected_len == pixels.len() {
-            let pic = GfxData::new_pic(width, height, pixels);
-            pics.push(pic);
-            cnt += 1;
-        } else {
-            println!(
-                "[WARN] PIC size mismatch: w={width}, h={height} => exp.len={expected_len}, but actual len={}",
-                pixels.len()
-            );
-        }
+        let mut pixels = huff_decode_chunk(bytes, &huffnodes);
+        munge_pic(width, height, &mut pixels);
+        let pic = GfxData::new_pic(width, height, pixels);
+        pics.push(pic);
     }
-    println!("[ROLF3D] Loaded {cnt}/{cnt_pics} pics");
+    println!("[ROLF3D] Loaded {cnt_pics} pics");
 
     Ok(pics)
 }
@@ -459,6 +478,37 @@ fn huff_decode_chunk(bytes: &[u8], huff_dict: &[u16]) -> Vec<u8> {
 
     assert_eq!(decoded_size, decoded.len());
     decoded
+}
+
+/// PICs are separated into planes => de-separate it
+/// -> see [VL_MungePic](https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/ID_VH.C#L163)
+fn munge_pic(width: u16, height: u16, pixels: &mut Vec<u8>) {
+    let width = width as usize;
+    let plane_width = width / 4;
+    assert_eq!(plane_width * 4, width);
+
+    // first munge => this will result in a "flipped" pic ...
+    // (I am not smart enough to munge and flip in the same loop :/)
+    let mut flipped = vec![0; pixels.len()];
+    let mut srcidx = 0;
+    for plane in 0..4 {
+        let mut destidx = 0;
+        for _y in 0..height {
+            for x in 0..plane_width {
+                flipped[destidx + 4 * x + plane] = pixels[srcidx];
+                srcidx += 1;
+            }
+            destidx += width;
+        }
+    }
+    // ..., then flip it
+    let mut dest_idx = 0;
+    for x in 0..width {
+        for y in 0..height as usize {
+            pixels[dest_idx] = flipped[y * width + x];
+            dest_idx += 1;
+        }
+    }
 }
 
 //--------------
