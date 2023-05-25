@@ -137,6 +137,8 @@ impl FontData {
 //-----------------------
 
 /// Map data - contains walls/doors and things.
+/// Note: all levels have a size of 64x64, but we keep the width and height
+/// as explicit values here, for flexibility.
 pub struct MapData {
     name: String,
     width: u16,

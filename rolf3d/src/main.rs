@@ -8,6 +8,23 @@
   TODO - implementation steps for ROLF3D:
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+MAP INVESTIGATION NOTES:
+    * how to detect solid wall -> https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/WL_GAME.C#L665
+        - if (tile < AREATILE) => solid wall !!
+        - if (tile >= 90 && tile <= 101) => door, vertical if even, lock = (tile - 90|91)/2
+            -> https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/WL_GAME.C#L688
+        - some interesting constants -> https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/WL_DEF.H#L61
+        #define PUSHABLETILE     98
+        #define EXITTILE         99        // at end of castle
+        #define AREATILE         107       // first of NUMAREAS floor tiles
+        #define NUMAREAS         37
+        #define ELEVATORTILE     21
+        #define AMBUSHTILE       106
+        #define ALTELEVATORTILE  107
+        - things, player star => see ScanInfoPlane
+            -> https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/WL_GAME.C#L221
+---------------------------------
+
     * Map investigations:
         - What is the meaning of each WALL and THING word, in the map arrays ?!?
         - Is plane #3 really used/needed? and is it really empty for ALL maps in WL1/WL6/SOD ??

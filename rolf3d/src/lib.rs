@@ -3,6 +3,7 @@
 
 mod assetloader;
 mod assets;
+mod defs;
 mod gameloop;
 mod scrbuf;
 mod sdl_wrapper;

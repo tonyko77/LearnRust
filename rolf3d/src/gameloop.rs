@@ -1,5 +1,8 @@
 //! Main game loop
 
+use std::collections::HashSet;
+
+use crate::defs::*;
 use crate::*;
 use sdl2::{event::Event, keyboard::Keycode};
 
@@ -10,6 +13,8 @@ pub struct GameLoop {
     tmp_x: i32,
     tmp_y: i32,
     tmp_automap: bool,
+    tmp_changed: bool,
+    tmp_amap_scale: i32,
 }
 
 impl GameLoop {
@@ -22,6 +27,8 @@ impl GameLoop {
             tmp_x: -5,
             tmp_y: -5,
             tmp_automap: false,
+            tmp_changed: true,
+            tmp_amap_scale: 12,
         }
     }
 }
@@ -36,17 +43,26 @@ impl GraphicsLoop for GameLoop {
                 Keycode::Down => self.tmp_y = Ord::min(self.tmp_y + 1, 53),
                 Keycode::Left => self.tmp_x = Ord::max(self.tmp_x - 1, -10),
                 Keycode::Right => self.tmp_x = Ord::min(self.tmp_x + 1, 53),
-                Keycode::PageUp => self.tmp_idx = (self.tmp_idx + 999) % 1000,
-                Keycode::PageDown => self.tmp_idx = (self.tmp_idx + 1) % 1000,
+                Keycode::PageUp => {
+                    self.tmp_idx = (self.tmp_idx + 999) % 1000;
+                    self.tmp_changed = true;
+                }
+                Keycode::PageDown => {
+                    self.tmp_idx = (self.tmp_idx + 1) % 1000;
+                    self.tmp_changed = true;
+                }
                 Keycode::Home => {
                     self.tmp_idx = 0;
                     self.tmp_x = -5;
                     self.tmp_y = -5;
+                    self.tmp_changed = true;
                 }
                 Keycode::End => {
                     self.tmp_x = -5;
                     self.tmp_y = -5;
                 }
+                Keycode::KpPlus => self.tmp_amap_scale = Ord::min(self.tmp_amap_scale + 1, 40),
+                Keycode::KpMinus => self.tmp_amap_scale = Ord::max(self.tmp_amap_scale - 1, 6),
                 _ => {}
             },
             _ => {}
@@ -62,6 +78,10 @@ impl GraphicsLoop for GameLoop {
             _temp_paint_gfx(self);
         }
 
+        if self.tmp_changed {
+            _temp_map_debug_info(&self);
+            self.tmp_changed = false;
+        }
         true
     }
 
@@ -75,7 +95,7 @@ impl GraphicsLoop for GameLoop {
 
 // TODO temporary paint map
 fn _temp_paint_map(zelf: &mut GameLoop) {
-    const SZ: i32 = 20;
+    let scl = zelf.tmp_amap_scale;
     let sw = zelf.scrbuf.width() as i32;
     let sh = zelf.scrbuf.height() as i32;
     zelf.scrbuf.fill_rect(0, 0, sw, sh, 0);
@@ -89,25 +109,65 @@ fn _temp_paint_map(zelf: &mut GameLoop) {
         for x in 0..mw {
             let xx = (x as i32) + zelf.tmp_x;
             let yy = (y as i32) + zelf.tmp_y;
-            let widx = map.wall(xx, yy) as usize;
+            let tile = map.wall(xx, yy);
             let thng = map.thing(xx, yy);
+            let ix = (x * scl) as i32;
+            let iy = (y * scl) as i32;
 
-            if widx > 0 {
-                // draw wall rect
-                let ix = (x * SZ) as i32;
-                let iy = (y * SZ) as i32;
-                if widx <= zelf.assets.walls.len() {
-                    let wall = &zelf.assets.walls[widx - 1];
-                    wall.draw_scaled(ix, iy, SZ, &mut zelf.scrbuf);
+            if tile == 0 {
+                // 0 tiles are MY CREATION -> out of bounds tile :/
+                zelf.scrbuf.fill_rect(ix + 1, iy + 1, scl - 1, scl - 1, 31);
+                continue;
+            }
+
+            if tile >= 90 && tile <= 101 {
+                // => door, vertical if even, lock = (tile - 90|91)/2
+                let widx = if tile >= 100 { 24 } else { (tile + 8) as usize };
+
+                if widx < zelf.assets.walls.len() {
+                    let wall = &zelf.assets.walls[widx];
+                    wall.draw_scaled(ix, iy, scl, &mut zelf.scrbuf);
                 } else {
-                    let wcol = (widx & 0xFF) as u8;
-                    zelf.scrbuf.fill_rect(ix, iy, SZ - 1, SZ - 1, wcol);
+                    let wcol = (tile - 89) as u8;
+                    zelf.scrbuf.fill_rect(ix, iy, scl, scl, 14);
+                    zelf.scrbuf.fill_rect(ix + 1, iy + 1, scl - 2, scl - 2, wcol);
                 }
-                // draw thing
-                if thng > 0 {
-                    zelf.scrbuf.fill_rect(ix + 4, iy + 4, 5, 5, 0);
-                    zelf.scrbuf.fill_rect(ix + 5, iy + 5, 3, 3, (thng & 0xFF) as u8);
+            } else if tile == AMBUSHTILE {
+                // ambush tile - has special meaning
+                zelf.scrbuf.fill_rect(ix, iy, scl, scl, 31);
+                zelf.scrbuf.fill_rect(ix + 1, iy + 1, scl - 2, scl - 2, 6);
+            } else if tile < AREATILE {
+                // solid wall => draw wall rect
+
+                // WHICH WALL TEXTURE corresponds to each solid tile:
+                // * wall textures are "in pairs" - alternating light and dark versions
+                // => (tile * 2) selects light/dark version, then -2 makes it 0-based
+                // !!ALSO!! LIGHT walls are used for N/S walls, and DARK for E/W walls
+                let widx = if tile == 21 { 41 } else { ((tile - 1) * 2) as usize };
+
+                if widx < zelf.assets.walls.len() {
+                    let wall = &zelf.assets.walls[widx];
+                    wall.draw_scaled(ix, iy, scl, &mut zelf.scrbuf);
+                } else {
+                    let wcol = (tile & 0xFF) as u8;
+                    zelf.scrbuf.fill_rect(ix, iy, scl, scl, 15);
+                    zelf.scrbuf.fill_rect(ix + 1, iy + 1, scl - 2, scl - 2, wcol);
                 }
+            } else {
+                // empty area
+                let cl = (tile - AREATILE) as u8;
+                zelf.scrbuf.fill_rect(ix + 1, iy + 1, scl - 2, scl - 2, cl);
+
+                // => TODO: what is the hidden meaning behind various empty area codes
+                // they seem to be between 108 (AREATILE + 1) and ~143
+                // OBSERVATION: all empty tiles in one room have THE SAME VALUE
+                // => maybe a way to alert enemies from the same area ?!?
+            }
+
+            // draw thing
+            if thng > 0 {
+                zelf.scrbuf.fill_rect(ix + 2, iy + 2, 4, 4, 0);
+                zelf.scrbuf.fill_rect(ix + 3, iy + 3, 2, 2, (thng & 0xFF) as u8);
             }
         }
     }
@@ -180,4 +240,46 @@ fn _temp_paint_palette(scrbuf: &mut ScreenBuffer) {
             cidx += 1;
         }
     }
+}
+
+// TODO TEMP get info about map
+fn _temp_map_debug_info(zelf: &GameLoop) {
+    let mapidx = zelf.tmp_idx % zelf.assets.maps.len();
+    let map = &zelf.assets.maps[mapidx];
+
+    // check for tiles >= AREATILE
+    let mut minwall = 9999;
+    let mut maxwall = 0;
+    let mut non_wall = HashSet::new();
+    for x in 0..64 {
+        for y in 0..64 {
+            let tile = map.wall(x, y);
+            if tile < AREATILE {
+                // solid wall go from 1 to 106 (AREATILE - 1)
+                minwall = Ord::min(minwall, tile);
+                maxwall = Ord::max(maxwall, tile);
+
+                // check for missing textures
+                let widx = (tile * 2 - 2) as usize;
+                if widx >= zelf.assets.walls.len() {
+                    if tile >= 90 && tile <= 101 {
+                        // it's a door, it is ok
+                    } else if tile == AMBUSHTILE {
+                        // it's an ambush tile
+                    } else {
+                        println!(
+                            "MISSING wall texture for tile {tile} => widx={widx} >= {}",
+                            zelf.assets.walls.len()
+                        );
+                    }
+                }
+            } else {
+                // seem to be between 108 (AREATILE + 1) and ~143
+                // but what do they mean ????
+                non_wall.insert(tile);
+            }
+        }
+    }
+
+    //println!("[DBG] Map #{mapidx} => minwall={minwall}, maxwall={maxwall}, empty={non_wall:?}");
 }
