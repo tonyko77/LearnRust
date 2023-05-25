@@ -47,11 +47,33 @@ impl GfxData {
     pub fn draw(&self, x: i32, y: i32, scrbuf: &mut ScreenBuffer) {
         let w = self.width as i32;
         let h = self.height as i32;
+        if w == 0 || h == 0 {
+            return;
+        }
+
         let mut idx = 0;
         for dx in 0..w {
             for dy in 0..h {
                 scrbuf.put_pixel(x + dx, y + dy, self.pixels[idx]);
                 idx += 1;
+            }
+        }
+    }
+
+    pub fn draw_scaled(&self, x: i32, y: i32, scaled_width: i32, scrbuf: &mut ScreenBuffer) {
+        let w = self.width as i32;
+        let h = self.height as i32;
+        if w == 0 || h == 0 {
+            return;
+        }
+
+        let scaled_height = h * scaled_width / w;
+        for dx in 0..scaled_width {
+            for dy in 0..scaled_height {
+                let ddx = Ord::min(dx * w / scaled_width, w - 1);
+                let ddy = Ord::min(dy * w / scaled_width, h - 1);
+                let idx = (ddx * h + ddy) as usize;
+                scrbuf.put_pixel(x + dx, y + dy, self.pixels[idx]);
             }
         }
     }

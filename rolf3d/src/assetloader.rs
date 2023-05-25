@@ -19,6 +19,7 @@ use crate::utils::*;
 
 /// Holds all the assets loaded from the game files.
 pub struct GameAssets {
+    game_type: &'static str,
     pub maps: Vec<MapData>,
     pub walls: Vec<GfxData>,
     pub sprites: Vec<GfxData>,
@@ -41,6 +42,7 @@ impl GameAssets {
 
         // build the asset holder
         Ok(Self {
+            game_type,
             maps,
             walls,
             sprites,
@@ -49,6 +51,11 @@ impl GameAssets {
             pics,
         })
     }
+
+    pub fn is_sod(&self) -> bool {
+        let ch = self.game_type.bytes().next().unwrap_or(0);
+        ch == ('S' as u8)
+    }
 }
 
 //----------------------
@@ -56,10 +63,12 @@ impl GameAssets {
 //----------------------
 
 /// All the supported asset file extensions.
-const EXTENSIONS: &[&'static str] = &["WL6", "WL1", "SOD", "SDM"];
+const EXTENSIONS: &[&'static str] = &["WL6", "WL1", "SOD", "SD1", "SD2", "SD3", "SDM"];
 
 /// All the supported asset file names.
 const FILES: &[&'static str] = &["MAPHEAD", "GAMEMAPS", "VGADICT", "VGAHEAD", "VGAGRAPH", "VSWAP"];
+
+// Indexes of each name in the above array - to reuse the strings :)
 const MAPHEAD: usize = 0;
 const GAMEMAPS: usize = 1;
 const VGADICT: usize = 2;
@@ -85,6 +94,8 @@ fn detect_game_type() -> Result<&'static str, String> {
 // Page loader (VSWAP)
 //----------------------
 
+/// Load and parse the VSWAP.ext file.
+/// Returns 2 vectors of graphics: the walls and the sprites.
 fn load_vswap(ext: &str, mutbuf: &mut [u8]) -> Result<(Vec<GfxData>, Vec<GfxData>), String> {
     let vs_len = load_file(VSWAP, ext, mutbuf)?;
     let vswap = &mutbuf[0..vs_len];
@@ -373,13 +384,12 @@ fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<(FontData, FontData, Vec<Gf
     // Chunks #1 and #2 are fonts => parse them
     let o1 = offsets[1];
     let o2 = offsets[2];
-    let o3 = offsets[3];
     // font #1
-    let bytes = &vgagraph[o1..o2];
+    let bytes = &vgagraph[o1..];
     let fontdata = huff_decode_chunk(bytes, &huffnodes);
     let font1 = parse_font(&fontdata);
     // font #2
-    let bytes = &vgagraph[o2..o3];
+    let bytes = &vgagraph[o2..];
     let fontdata = huff_decode_chunk(bytes, &huffnodes);
     let font2 = parse_font(&fontdata);
 
@@ -388,8 +398,7 @@ fn load_pics(ext: &str, mutbuf: &mut [u8]) -> Result<(FontData, FontData, Vec<Gf
     let mut pics = Vec::with_capacity(cnt_pics);
     for i in 0..cnt_pics {
         let o1 = offsets[i + 3];
-        let o2 = offsets[i + 4];
-        let bytes = &vgagraph[o1..o2];
+        let bytes = &vgagraph[o1..];
         let width = pic_sizes[2 * i];
         let height = pic_sizes[2 * i + 1];
         let mut pixels = huff_decode_chunk(bytes, &huffnodes);

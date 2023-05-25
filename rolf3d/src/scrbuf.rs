@@ -7,16 +7,18 @@ pub struct ScreenBuffer {
     width: usize,
     height: usize,
     bytes: Vec<u8>,
+    use_sod_palette: bool,
 }
 
 impl ScreenBuffer {
     /// Create a new screen buffer.
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new(width: usize, height: usize, use_sod_palette: bool) -> Self {
         let len = width * height;
         Self {
             width,
             height,
             bytes: vec![0; len],
+            use_sod_palette,
         }
     }
 
@@ -83,7 +85,7 @@ impl ScreenBuffer {
         let mut idx = 0;
         for y in 0..(self.height as i32) {
             for x in 0..(self.width as i32) {
-                let color = palette_to_rgb(self.bytes[idx]);
+                let color = palette_to_rgb(self.bytes[idx], self.use_sod_palette);
                 painter.draw_pixel(x, y, color);
                 idx += 1;
             }
@@ -94,9 +96,22 @@ impl ScreenBuffer {
 //--------------------------
 //  Internal stuff
 
+// NOTE: the palettes of Wolf3D and SOD are different for only 2 colors:
+//      166 => RGB(0, 56, 0)
+//      167 => RGB(0, 40, 0)
 #[inline]
-fn palette_to_rgb(c: u8) -> RGB {
-    // assert_eq!(PALETTE.len(), 768);
+fn palette_to_rgb(c: u8, sod: bool) -> RGB {
+    if sod {
+        match c {
+            166 => {
+                return RGB::from(0, 56, 0);
+            }
+            167 => {
+                return RGB::from(0, 40, 0);
+            }
+            _ => {}
+        }
+    }
     let idx = (c as usize) * 3;
     RGB::from(PALETTE[idx], PALETTE[idx + 1], PALETTE[idx + 2])
 }

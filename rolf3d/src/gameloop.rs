@@ -14,8 +14,9 @@ pub struct GameLoop {
 
 impl GameLoop {
     pub fn new(width: usize, height: usize, assets: GameAssets) -> Self {
+        let is_sod = assets.is_sod();
         Self {
-            scrbuf: ScreenBuffer::new(width, height),
+            scrbuf: ScreenBuffer::new(width, height, is_sod),
             assets,
             tmp_idx: 0,
             tmp_x: -5,
@@ -74,6 +75,7 @@ impl GraphicsLoop for GameLoop {
 
 // TODO temporary paint map
 fn _temp_paint_map(zelf: &mut GameLoop) {
+    const SZ: i32 = 20;
     let sw = zelf.scrbuf.width() as i32;
     let sh = zelf.scrbuf.height() as i32;
     zelf.scrbuf.fill_rect(0, 0, sw, sh, 0);
@@ -87,19 +89,24 @@ fn _temp_paint_map(zelf: &mut GameLoop) {
         for x in 0..mw {
             let xx = (x as i32) + zelf.tmp_x;
             let yy = (y as i32) + zelf.tmp_y;
-            let wall = map.wall(xx, yy);
+            let widx = map.wall(xx, yy) as usize;
             let thng = map.thing(xx, yy);
 
-            if wall > 0 {
+            if widx > 0 {
                 // draw wall rect
-                let ix = (x * 9) as i32;
-                let iy = (y * 9) as i32;
-                let wcol = (wall & 0xFF) as u8;
-                zelf.scrbuf.fill_rect(ix, iy, 8, 8, wcol);
+                let ix = (x * SZ) as i32;
+                let iy = (y * SZ) as i32;
+                if widx <= zelf.assets.walls.len() {
+                    let wall = &zelf.assets.walls[widx - 1];
+                    wall.draw_scaled(ix, iy, SZ, &mut zelf.scrbuf);
+                } else {
+                    let wcol = (widx & 0xFF) as u8;
+                    zelf.scrbuf.fill_rect(ix, iy, SZ - 1, SZ - 1, wcol);
+                }
                 // draw thing
                 if thng > 0 {
-                    zelf.scrbuf.fill_rect(ix + 2, iy + 2, 4, 4, 0);
-                    zelf.scrbuf.fill_rect(ix + 3, iy + 3, 2, 2, (thng & 0xFF) as u8);
+                    zelf.scrbuf.fill_rect(ix + 4, iy + 4, 5, 5, 0);
+                    zelf.scrbuf.fill_rect(ix + 5, iy + 5, 3, 3, (thng & 0xFF) as u8);
                 }
             }
         }
@@ -169,7 +176,7 @@ fn _temp_paint_palette(scrbuf: &mut ScreenBuffer) {
     for y in 0..16 {
         for x in 0..16 {
             let c = cidx as u8;
-            scrbuf.fill_rect(x * SQSIZE, y * SQSIZE, SQSIZE - 1, SQSIZE - 1, c);
+            scrbuf.fill_rect(x * SQSIZE, y * SQSIZE, SQSIZE, SQSIZE, c);
             cidx += 1;
         }
     }
