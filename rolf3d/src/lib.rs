@@ -5,6 +5,7 @@ mod assetloader;
 mod assets;
 mod defs;
 mod gameloop;
+mod input;
 mod scrbuf;
 mod sdl_wrapper;
 mod utils;

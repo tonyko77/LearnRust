@@ -25,6 +25,12 @@ MAP INVESTIGATION NOTES:
             -> https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/WL_GAME.C#L221
 ---------------------------------
 
+    * REFACTORINGS - add new classes:
+        - InputManager (input.rs) - handles keyboard & mouse, knows if key/mousebtn is pressed, set key/btn timings
+        - MapSimulator (mapsim.rs) - simulates the game world -> player, doors, actors, AI, timings etc
+        - ViewRenderer3D (render3d.rs) - renders the 3D world
+        - AutomapRenderer (automap.rs) - renders the automap, knows seen tiles (game is ALWAYS PAUSED in automap)
+
     * Map investigations:
         - What is the meaning of each WALL and THING word, in the map arrays ?!?
         - Is plane #3 really used/needed? and is it really empty for ALL maps in WL1/WL6/SOD ??
