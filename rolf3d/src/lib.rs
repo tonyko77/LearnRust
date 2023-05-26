@@ -16,6 +16,10 @@ mod utils;
 // TODO remove "pub" from internal modules
 pub use assetloader::*;
 pub use assets::*;
+pub use automap::*;
 pub use gameloop::*;
+pub use input::*;
+pub use livemap::*;
+pub use render3d::*;
 pub use scrbuf::*;
 pub use sdl_wrapper::*;

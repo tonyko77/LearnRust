@@ -1,5 +1,7 @@
 //! LiveMapSimulator - simulates the game world -> player, doors, actors, AI, timings etc
 
+// TODO TEMPORARY !!!
+#![allow(unused_variables, dead_code)]
 use crate::{input::InputManager, MapData};
 
 pub struct LiveMapSimulator {

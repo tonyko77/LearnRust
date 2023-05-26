@@ -1,7 +1,6 @@
 //! SDL2 wrapper, to simplify using SDL2
 
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
+use sdl2::event::{Event, WindowEvent};
 use sdl2::pixels::PixelFormatEnum;
 use std::time::{Duration, Instant};
 
@@ -133,11 +132,17 @@ pub fn run_game_loop(cfg: &SdlConfiguration, gfx_loop: &mut dyn GraphicsLoop) ->
         // consume the event loop
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => break 'running,
+                Event::Quit { .. } => break 'running,
+                Event::Window { win_event, .. } => {
+                    // TODO - steal mouse only when game is RUNNING ?!
+                    if win_event == WindowEvent::FocusGained {
+                        // sdl_context.mouse().capture(true);
+                        // sdl_context.mouse().show_cursor(false);
+                    } else if win_event == WindowEvent::FocusLost {
+                        sdl_context.mouse().capture(false);
+                        sdl_context.mouse().show_cursor(true);
+                    }
+                }
                 _ => {
                     if !gfx_loop.handle_event(&event) {
                         break 'running;
@@ -223,6 +228,8 @@ impl<'a> Painter for InternalTexturePainter<'a> {
         }
     }
 }
+
+//--------------------------
 
 struct FpsAndElapsedCounter {
     time_sum: f64,
