@@ -1,4 +1,6 @@
-//! Main game loop
+//! Main game loop.
+//! Also acts as a facade, to hold and manage all game objects
+//! (assets, renderers, other managers etc)
 
 use std::collections::HashSet;
 
@@ -102,14 +104,14 @@ fn _temp_paint_map(zelf: &mut GameLoop) {
 
     let mapidx = zelf.tmp_idx % zelf.assets.maps.len();
     let map = &zelf.assets.maps[mapidx];
-    let mw = map.width();
-    let mh = map.height();
+    let mw = map.width as i32;
+    let mh = map.height as i32;
 
     for y in 0..mh {
         for x in 0..mw {
             let xx = (x as i32) + zelf.tmp_x;
             let yy = (y as i32) + zelf.tmp_y;
-            let tile = map.wall(xx, yy);
+            let tile = map.tile(xx, yy);
             let thng = map.thing(xx, yy);
             let ix = (x * scl) as i32;
             let iy = (y * scl) as i32;
@@ -253,7 +255,7 @@ fn _temp_map_debug_info(zelf: &GameLoop) {
     let mut non_wall = HashSet::new();
     for x in 0..64 {
         for y in 0..64 {
-            let tile = map.wall(x, y);
+            let tile = map.tile(x, y);
             if tile < AREATILE {
                 // solid wall go from 1 to 106 (AREATILE - 1)
                 minwall = Ord::min(minwall, tile);
@@ -280,6 +282,4 @@ fn _temp_map_debug_info(zelf: &GameLoop) {
             }
         }
     }
-
-    //println!("[DBG] Map #{mapidx} => minwall={minwall}, maxwall={maxwall}, empty={non_wall:?}");
 }

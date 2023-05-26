@@ -3,9 +3,12 @@
 
 mod assetloader;
 mod assets;
+mod automap;
 mod defs;
 mod gameloop;
 mod input;
+mod livemap;
+mod render3d;
 mod scrbuf;
 mod sdl_wrapper;
 mod utils;

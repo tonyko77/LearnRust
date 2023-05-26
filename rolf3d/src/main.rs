@@ -9,6 +9,22 @@
   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 MAP INVESTIGATION NOTES:
+    * what I know (ALMOST) for sure, so far:
+        - tiles:
+            * if tile == AMBUSHTILE (106) => special meaning (probably: enemy in ambush mode)
+                - also, it's actually a non-solid tile :)
+            * if tile < AREATILE (107) => solid wall
+            * if tile in [90..101] => door, vertical if even, lock = (tile - 90|91)/2
+                -> 100/101 are elevator doors (looks like only 100 is ever used)
+            * if tile >= 108 => empty cell
+                -> NOT SURE: seems like different values are used here, to distinguish btw rooms
+        - tile textures:
+            * for a SOLID tile with value x => texture code is: (x-1)*2 + 0|1
+                -> there are 2 textures per tile code: LIGHT (for N|S) and DARK (for E|W)
+            * for a DOOR with x in [90..99] => texture code is: (x+8)
+            * for the ELEVATOR door, the texture code is: 24
+            * TODO - confirm all this in the WOLF3D code !!!
+
     * how to detect solid wall -> https://github.com/id-Software/wolf3d/blob/master/WOLFSRC/WL_GAME.C#L665
         - if (tile < AREATILE) => solid wall !!
         - if (tile >= 90 && tile <= 101) => door, vertical if even, lock = (tile - 90|91)/2
@@ -27,9 +43,9 @@ MAP INVESTIGATION NOTES:
 
     * REFACTORINGS - add new classes:
         - InputManager (input.rs) - handles keyboard & mouse, knows if key/mousebtn is pressed, set key/btn timings
-        - MapSimulator (mapsim.rs) - simulates the game world -> player, doors, actors, AI, timings etc
-        - ViewRenderer3D (render3d.rs) - renders the 3D world
-        - AutomapRenderer (automap.rs) - renders the automap, knows seen tiles (game is ALWAYS PAUSED in automap)
+        - LiveMapSimulator (livemap.rs) - simulates the game world -> player, doors, actors, AI, timings etc
+        - AutomapRenderer (automap.rs) - renders the automap using the LiveMapSimulator
+        - ThreeDRenderer (render3d.rs) - renders the 3D world using the LiveMapSimulator
 
     * Map investigations:
         - What is the meaning of each WALL and THING word, in the map arrays ?!?

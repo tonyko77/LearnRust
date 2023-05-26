@@ -140,25 +140,25 @@ impl FontData {
 /// Note: all levels have a size of 64x64, but we keep the width and height
 /// as explicit values here, for flexibility.
 pub struct MapData {
-    name: String,
-    width: u16,
-    height: u16,
-    walls: Vec<u16>,
+    pub name: String,
+    pub width: u16,
+    pub height: u16,
+    tiles: Vec<u16>,
     things: Vec<u16>,
 }
 
 impl MapData {
-    pub fn new(name: String, width: u16, height: u16, walls: Vec<u16>, things: Vec<u16>) -> Self {
+    pub fn new(name: String, width: u16, height: u16, tiles: Vec<u16>, things: Vec<u16>) -> Self {
         // some silly checks - seem to be valid for WL1, WL6 and SOD
         assert!(name.len() > 0);
         // check that maps are always 64 x 64
         assert_eq!(64, width);
         assert_eq!(64, height);
         // check that planes have exactly 64*64 = 4096 words
-        assert_eq!(4096, walls.len());
+        assert_eq!(4096, tiles.len());
         assert_eq!(4096, things.len());
         // check that all wall IDs are <= 0xFF
-        let wallsok = walls.iter().all(|w| *w <= 0xFF);
+        let wallsok = tiles.iter().all(|w| *w <= 0xFF);
         assert!(wallsok);
         // check that all thing IDs are <= 0x1FF
         let thingsok = things.iter().all(|t| *t <= 0x1FF);
@@ -168,29 +168,14 @@ impl MapData {
             name,
             width,
             height,
-            walls,
+            tiles,
             things,
         }
     }
 
     #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    #[inline]
-    pub fn width(&self) -> i32 {
-        self.width as i32
-    }
-
-    #[inline]
-    pub fn height(&self) -> i32 {
-        self.height as i32
-    }
-
-    #[inline]
-    pub fn wall(&self, x: i32, y: i32) -> u16 {
-        self.safe_item_from_array(x, y, &self.walls)
+    pub fn tile(&self, x: i32, y: i32) -> u16 {
+        self.safe_item_from_array(x, y, &self.tiles)
     }
 
     #[inline]
