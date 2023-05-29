@@ -13,31 +13,37 @@ use sdl2::keyboard::*;
 const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 
 // adjustments for engine
-const WALK_SPEED: f64 = 2.5;
-const ROTATE_SPEED: f64 = 60.0;
-const RUN_MULTIPLIER: f64 = 2.5;
-const MIN_DISTANCE_TO_WALL: f64 = 0.25;
+const WALK_SPEED: f64 = 3.5;
+const ROTATE_SPEED: f64 = 90.0;
+const RUN_MULTIPLIER: f64 = 2.0;
+const MIN_DISTANCE_TO_WALL: f64 = 0.375;
 const HALF_HORIZ_FOV: f64 = 23.0;
 const WALL_HEIGHT_SCALER: f64 = 1.0;
 const MINI_MAP_WIDTH_PERCENT: i32 = 30;
 const EPSILON: f64 = 0.001;
 
 // bit flags for keys
-const DO_WALK_FWD: u32 = 0x01;
-const DO_WALK_BACK: u32 = 0x02;
-const DO_ROT_LEFT: u32 = 0x04;
-const DO_ROT_RIGHT: u32 = 0x08;
-const DO_STRAFE_LEFT: u32 = 0x10;
-const DO_STRAFE_RIGHT: u32 = 0x20;
-const DO_RUN: u32 = 0x40;
+const DO_WALK_FWD1: u32 = 1 << 0;
+const DO_WALK_FWD2: u32 = 1 << 1;
+const DO_WALK_FWD: u32 = DO_WALK_FWD1 | DO_WALK_FWD2;
+const DO_WALK_BACK1: u32 = 1 << 2;
+const DO_WALK_BACK2: u32 = 1 << 3;
+const DO_WALK_BACK: u32 = DO_WALK_BACK1 | DO_WALK_BACK2;
+const DO_ROT_LEFT: u32 = 1 << 4;
+const DO_ROT_RIGHT: u32 = 1 << 5;
+const DO_STRAFE_LEFT: u32 = 1 << 6;
+const DO_STRAFE_RIGHT: u32 = 1 << 7;
+const DO_RUN: u32 = 1 << 8;
 
 const KEY_PAIRS: &[(Keycode, u32)] = &[
-    (Keycode::W, DO_WALK_FWD),
-    (Keycode::S, DO_WALK_BACK),
-    (Keycode::A, DO_ROT_LEFT),
-    (Keycode::D, DO_ROT_RIGHT),
-    (Keycode::Q, DO_STRAFE_LEFT),
-    (Keycode::E, DO_STRAFE_RIGHT),
+    (Keycode::W, DO_WALK_FWD1),
+    (Keycode::S, DO_WALK_BACK1),
+    (Keycode::A, DO_STRAFE_LEFT),
+    (Keycode::D, DO_STRAFE_RIGHT),
+    (Keycode::Up, DO_WALK_FWD2),
+    (Keycode::Down, DO_WALK_BACK2),
+    (Keycode::Left, DO_ROT_LEFT),
+    (Keycode::Right, DO_ROT_RIGHT),
     (Keycode::LShift, DO_RUN),
 ];
 
